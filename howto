@@ -1,0 +1,24 @@
+Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-sdk/bin).
+
+Build and install all naclports, don't forget the patch.
+NACL_TOOLCHAIN_ROOT=$HOME/root/nacl-sdk ./nacl-install-all-bitsize.sh 64
+
+Build and install, in this order, the following packages from http://github.com/eugenis.
+All of them have a build.sh script in the repository root.
+  bzip2
+  boost
+  glib
+  pango
+
+...
+
+PROFIT!
+
+-----------------------------------------------------------------------------------------
+
+Of course, you also need to build and install wesnoth. Unfortunately, that's not covered by
+this tutorial.
+
+Boost port lacks boost-asio, which requires network headers, which are missing from the current glibc toolchain.
+
+There are surely more problems that I do not know of yet.
