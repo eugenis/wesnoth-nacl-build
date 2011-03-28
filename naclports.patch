@@ -1,0 +1,82 @@
+Index: packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch
+===================================================================
+--- packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(revision 185)
++++ packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(working copy)
+@@ -10,3 +10,14 @@
+  
+  EXTRA_DIST = fontconfig.pc.in fonts.conf.in fonts.dtd \
+  	fontconfig.spec.in fontconfig.spec fontconfig-zip.in ChangeLog
++--- fontconfig-2.7.3/fontconfig-2.7.3-build/config.h	2011-03-28 05:07:08.000000000 +0400
+++++ fontconfig-2.7.3-nacl//fontconfig-2.7.3-build/config.h	2011-03-28 22:43:20.000000000 +0400
++@@ -75,7 +75,7 @@
++ #define HAVE_INTTYPES_H 1
++ 
++ /* Define to 1 if you have the `link' function. */
++-#define HAVE_LINK 1
+++#undef HAVE_LINK
++ 
++ /* Define to 1 if you have the `lrand48' function. */
++ #define HAVE_LRAND48 1
+Index: packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch
+===================================================================
+--- packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(revision 185)
++++ packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(working copy)
+@@ -1,6 +1,6 @@
+-diff -Naur cairo-1.8.8/build/config.sub cairo-1.8.8.nacl/build/config.sub
+---- cairo-1.8.8/build/config.sub	2009-05-05 01:45:31.000000000 -0700
+-+++ cairo-1.8.8.nacl/build/config.sub	2009-10-14 18:02:17.289965000 -0700
++diff -ur cairo-1.8.8/build/config.sub cairo-1.8.8-nacl//build/config.sub
++--- cairo-1.8.8/build/config.sub	2009-05-05 12:45:31.000000000 +0400
+++++ cairo-1.8.8-nacl//build/config.sub	2011-03-28 22:14:30.000000000 +0400
+ @@ -759,6 +759,10 @@
+  		basic_machine=i370-ibm
+  		os=-mvs
+@@ -21,9 +21,9 @@
+  	# Remember, each alternative MUST END IN *, to match a version number.
+  		;;
+  	-qnx*)
+-diff -Naur cairo-1.8.8/config.sub cairo-1.8.8.nacl/config.sub
+---- cairo-1.8.8/config.sub	2009-05-05 01:45:31.000000000 -0700
+-+++ cairo-1.8.8.nacl/config.sub	2009-10-14 18:04:16.014691000 -0700
++diff -ur cairo-1.8.8/config.sub cairo-1.8.8-nacl//config.sub
++--- cairo-1.8.8/config.sub	2009-05-05 12:45:31.000000000 +0400
+++++ cairo-1.8.8-nacl//config.sub	2011-03-28 22:14:30.000000000 +0400
+ @@ -759,6 +759,10 @@
+  		basic_machine=i370-ibm
+  		os=-mvs
+@@ -44,9 +44,9 @@
+  	# Remember, each alternative MUST END IN *, to match a version number.
+  		;;
+  	-qnx*)
+-diff -uNr cairo-1.8.8/configure cairo-1.8.8.nacl/configure
+---- cairo-1.8.8/configure	2009-06-16 16:25:50.000000000 -0700
+-+++ cairo-1.8.8.nacl/configure	2009-10-14 18:04:16.014691000 -0700
++diff -ur cairo-1.8.8/configure cairo-1.8.8-nacl//configure
++--- cairo-1.8.8/configure	2009-06-16 16:25:50.000000000 +0400
+++++ cairo-1.8.8-nacl//configure	2011-03-28 22:14:40.000000000 +0400
+ @@ -12104,18 +12104,22 @@
+  
+  
+@@ -70,7 +70,7 @@
+  #define PACKAGE_TARNAME USE_cairo_INSTEAD
+  _ACEOF
+  
+-@@ -18179,10 +18179,10 @@
++@@ -18175,10 +18179,10 @@
+         } && test -s conftest.$ac_objext; then
+  
+  
+@@ -83,3 +83,13 @@
+    if test "$ax_cv_c_float_words_bigendian" = unknown; then
+      ax_cv_c_float_words_bigendian=no
+    else
++@@ -20319,8 +20323,6 @@
++ 
++ MAYBE_WARN="$MAYBE_WARN -fno-strict-aliasing -fno-common"
++ 
++-MAYBE_WARN="$MAYBE_WARN -Wp,-D_FORTIFY_SOURCE=2"
++-
++ # invalidate cached value if MAYBE_WARN has changed
++ if test "x$cairo_cv_warn_maybe" != "x$MAYBE_WARN"; then
++ 	unset cairo_cv_warn_cflags
++Only in cairo-1.8.8-nacl/: configure.orig
