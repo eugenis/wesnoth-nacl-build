@@ -3,12 +3,11 @@ Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-
 Build and install all naclports, don't forget the patch.
 NACL_TOOLCHAIN_ROOT=$HOME/root/nacl-sdk ./nacl-install-all-bitsize.sh 64
 
-Build and install, in this order, the following packages from http://github.com/eugenis.
-All of them have a build.sh script in the repository root.
-  bzip2
-  boost
-  glib
-  pango
+Build and install the following packages from http://github.com/eugenis.
+Most of them have a build.sh script in the repository root. "A -> B" mean B depends on A.
+  bzip2 -> boost
+  glib -> pango
+  SDL_mixer
 
 ...
 
@@ -19,6 +18,9 @@ PROFIT!
 Of course, you also need to build and install wesnoth. Unfortunately, that's not covered by
 this tutorial.
 
-Boost port lacks boost-asio, which requires network headers, which are missing from the current glibc toolchain.
+Boost-asio most surely does not work as it is, because it requires network headers.
+But as it is a header-only library, that is not a problem until you start building Wesnoth itself.
+
+We are also missing the following libs: libsdl-image, libsdl-net, libsdl-ttf.
 
 There are surely more problems that I do not know of yet.
