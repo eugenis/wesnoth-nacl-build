@@ -8,6 +8,7 @@ Most of them have a build.sh script in the repository root. "A -> B" mean B depe
   bzip2 -> boost
   glib -> pango
   SDL_mixer
+  SDL_image
 
 ...
 
@@ -21,6 +22,6 @@ this tutorial.
 Boost-asio most surely does not work as it is, because it requires network headers.
 But as it is a header-only library, that is not a problem until you start building Wesnoth itself.
 
-We are also missing the following libs: libsdl-image, libsdl-net, libsdl-ttf.
+We are also missing the following libs: libsdl-net, libsdl-ttf.
 
 There are surely more problems that I do not know of yet.
