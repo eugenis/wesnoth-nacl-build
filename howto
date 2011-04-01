@@ -10,8 +10,11 @@ Most of them have a build.sh script in the repository root. "A -> B" mean B depe
   SDL_mixer
   SDL_image
   SDL_ttf
+  SDL_net
 
-...
+Get wesnoth-1.9.4 from official site, apply the patch (wesnoth-1.9.4-nacl.patch), run build.sh.
+
+Fix all remaining issues.
 
 PROFIT!
 
@@ -22,8 +25,6 @@ this tutorial.
 
 Boost-asio most surely does not work as it is, because it requires network headers.
 But as it is a header-only library, that is not a problem until you start building Wesnoth itself.
-
-We are also missing libsdl-net.
 
 There is something wrong with threads in glib-nacl: run pangoview (from pango-nacl) and see an assertion failure.
 
