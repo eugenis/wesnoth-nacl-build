@@ -1,0 +1,451 @@
+diff --git a/SConstruct b/SConstruct
+index ff91c69..f337866 100755
+--- a/SConstruct
++++ b/SConstruct
+@@ -282,6 +282,12 @@ if env["prereqs"]:
+     conf.CheckLib("m")
+     conf.CheckFunc("round")
+ 
++    if env['host'] == 'nacl64':
++      env.Append(LIBS = ['-lpthread', '-lSDL', '-ldl', '-lppapi_cpp', '-ljpeg',
++                         '-lpng', '-ltiff', '-lexpat', '-lpixman-1',
++                         '-lppruntime', '-lplatform', '-lgio',
++                         '-lsrpc', '-lnosys'])
++
+     have_server_prereqs = \
+         conf.CheckCPlusPlus(gcc_version = "3.3") and \
+         conf.CheckGettextLibintl() and \
+@@ -349,6 +355,11 @@ else:
+     test_env = env.Clone()
+     client_env = env.Clone()
+ 
++
++if env['host'] == 'nacl64':
++  env['_LIBFLAGS'] = '-Wl,--start-group ' + env['_LIBFLAGS'] + ' -Wl,--end-group'
++  client_env['_LIBFLAGS'] = '-Wl,--start-group ' + client_env['_LIBFLAGS'] + ' -Wl,--end-group'
++
+ have_msgfmt = env["MSGFMT"]
+ if not have_msgfmt:
+      env["nls"] = False
+@@ -362,7 +373,7 @@ if not env['nls']:
+ #
+ 
+ for env in [test_env, client_env, env]:
+-    env.Append(CPPPATH = ["#/", "#/src"])
++    env.Prepend(CPPPATH = ["#/", "#/src"])
+ 
+     env.Append(CPPDEFINES = ["HAVE_CONFIG_H"])
+ 
+@@ -433,7 +444,7 @@ else:
+         env["svnrev"] = ""
+ 
+ Export(Split("env client_env test_env have_client_prereqs have_server_prereqs have_test_prereqs"))
+-SConscript(dirs = Split("po doc packaging/windows"))
++SConscript(dirs = Split("po doc packaging/windows ppapi"))
+ 
+ binaries = Split("wesnoth wesnothd cutter exploder campaignd test")
+ builds = {
+diff --git a/build.sh b/build.sh
+new file mode 100755
+index 0000000..106108d
+--- /dev/null
++++ b/build.sh
+@@ -0,0 +1,24 @@
++#!/bin/bash
++set -e -x
++
++ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
++PATH=$ROOT/bin:$ROOT/nacl64/usr/bin:$PATH
++
++# export SDL_LIBS="-L$ROOT/nacl64/usr/lib -lSDL -lppapi_cpp -lpthread -lm"
++
++PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j15 host=nacl64 \
++  prefix=$ROOT/nacl64/usr boostdir=$ROOT/nacl64/usr/include/boost \
++  boostlibdir=$ROOT/nacl64/usr/lib sdldir=$ROOT/nacl64/usr nls=no \
++  default_targets=wesnoth
++
++# CC=nacl64-gcc AR=nacl64-ar RANLIB=nacl64-ranlib PKG_CONFIG_LIBDIR=$ROOT/nacl64/usr/lib/pkgconfig \
++#   ./configure --host=nacl64 --prefix=$ROOT/nacl64/usr --without-x
++# make
++# make install
++
++
++# The following line defines the right -l argument order for static libraries.
++# -lSDL -lpixman-1 -ldl -lfreetype -lexpat -lpng -ltiff -ljpeg -lppapi_cpp
++
++# Complete link command:
++# ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk} PATH=$ROOT/bin:$ROOT/nacl64/usr/bin:$PATH nacl64-g++ -o wesnoth -pthread build/release/game.o build/release/libwesnoth_extras.a build/release/lua/liblua.a build/release/libwesnoth_core.a build/release/ana/src/libana.a build/release/libwesnoth_sdl.a build/release/libwesnoth.a -L/usr/local/google/home/eugenis/root/nacl-sdk/nacl64/usr/lib -L/usr/local/google/home/eugenis/root/nacl-sdk/nacl64/usr/lib -lpthread -lboost_iostreams -lSDL_net -lboost_system -lboost_thread -lpangocairo-1.0 -lcairo -lpangoft2-1.0 -lpango-1.0 -lm -lz -lgobject-2.0 -lgmodule-2.0 -lgthread-2.0 -lrt -lglib-2.0 -lfontconfig -lboost_regex -lSDL_ttf -lSDL_mixer -lSDL_image -lSDL -lpixman-1 -ldl -lfreetype -lexpat -lpng -ltiff -ljpeg -lppapi_cpp
+diff --git a/ppapi/SConscript b/ppapi/SConscript
+new file mode 100644
+index 0000000..59ddb6c
+--- /dev/null
++++ b/ppapi/SConscript
+@@ -0,0 +1,17 @@
++import commands, os
++from subprocess import Popen, PIPE
++from glob import glob
++
++Import("*")
++
++for env in [test_env, client_env, env]:
++    env.Append(CPPDEFINES = "$EXTRA_DEFINE")
++
++libwesnoth_ppapi_sources = Split("""
++    wesnoth_pepper_instance.cc
++    wesnoth_pepper_module.cc
++    """)
++
++libwesnoth_ppapi = env.Library("wesnoth_ppapi", libwesnoth_ppapi_sources)
++
++Export("libwesnoth_ppapi")
+diff --git a/ppapi/wesnoth_pepper_instance.cc b/ppapi/wesnoth_pepper_instance.cc
+new file mode 100644
+index 0000000..6692fe7
+--- /dev/null
++++ b/ppapi/wesnoth_pepper_instance.cc
+@@ -0,0 +1,136 @@
++// Copyright 2010 The Native Client Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can
++// be found in the LICENSE file.
++
++#include "wesnoth_pepper_instance.h"
++
++#include <ppapi/cpp/completion_callback.h>
++#include <ppapi/cpp/var.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include <cassert>
++#include <cmath>
++#include <cstring>
++
++// extern "C" {
++#include <SDL_video.h>
++//extern int jumpnbump_main(int argc, char *argv[]);
++extern int wesnoth_main(int argc,char *argv[]);
++  // temporary hacks
++#include <SDL.h>
++#include <SDL_nacl.h>
++// }
++
++namespace {
++const int kPthreadMutexSuccess = 0;
++const char* const kPaintMethodId = "paint";
++const double kInvalidPiValue = -1.0;
++
++// This is called by the brower when the 2D context has been flushed to the
++// browser window.
++void FlushCallback(void* data, int32_t result) {
++  (void)result;
++  static_cast<wesnoth_pepper::WesnothPepperInstance*>(data)->set_flush_pending(false);
++}
++}  // namespace
++
++namespace wesnoth_pepper {
++
++WesnothPepperInstance::WesnothPepperInstance(PP_Instance instance)
++    : pp::Instance(instance),
++      graphics_2d_context_(NULL),
++      flush_pending_(false),
++      quit_(false),
++      compute_pi_thread_(0),
++      width_(0),
++      height_(0),
++      pi_(0.0) {
++
++  printf("ctor\n");
++}
++
++WesnothPepperInstance::~WesnothPepperInstance() {
++  quit_ = true;
++  if (compute_pi_thread_) {
++    pthread_join(compute_pi_thread_, NULL);
++  }
++  // DestroyContext();
++}
++
++void WesnothPepperInstance::DidChangeView(const pp::Rect& position,
++                                const pp::Rect& clip) {
++
++  printf("did change view, new %dx%d, old %dx%d\n", position.size().width(), position.size().height(),
++      width_, height_);
++
++  if (width_ && height_)
++    return;
++
++  if (position.size().width() == width_ &&
++      position.size().height() == height_)
++    return;  // Size didn't change, no need to update anything.
++
++  width_ = position.size().width();
++  height_ = position.size().height();
++
++  printf("didchangeview, instance %p %p\n", this, static_cast<pp::Instance*>(this));
++  SDL_NACL_SetInstance(pp_instance(), width_, height_);
++  // int lval = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
++  int lval = SDL_Init(SDL_INIT_VIDEO);
++  assert(lval >= 0);
++  pthread_create(&compute_pi_thread_, NULL, ComputePi, this);
++}
++
++pp::Var WesnothPepperInstance::GetInstanceObject() {
++  WesnothPepperInstanceScriptObject* script_object = new WesnothPepperInstanceScriptObject(this);
++  return pp::Var(this, script_object);
++}
++
++bool WesnothPepperInstance::HandleInputEvent(const PP_InputEvent& event) {
++  SDL_NACL_PushEvent(&event);
++  return true;
++}
++
++bool WesnothPepperInstance::Init(uint32_t argc, const char* argn[], const char* argv[]) {
++  // pthread_create(&compute_pi_thread_, NULL, ComputePi, this);
++  return true;
++}
++
++pp::Var WesnothPepperInstance::Paint() {
++  return pp::Var(pi());
++}
++
++bool WesnothPepperInstance::WesnothPepperInstanceScriptObject::HasMethod(
++    const pp::Var& method,
++    pp::Var* exception) {
++  if (!method.is_string()) {
++    return false;
++  }
++  std::string method_name = method.AsString();
++  return method_name == kPaintMethodId;
++}
++
++pp::Var WesnothPepperInstance::WesnothPepperInstanceScriptObject::Call(
++    const pp::Var& method,
++    const std::vector<pp::Var>& args,
++    pp::Var* exception) {
++  if (!method.is_string()) {
++    return false;
++  }
++  std::string method_name = method.AsString();
++  if (app_instance_ != NULL && method_name == kPaintMethodId) {
++    return app_instance_->Paint();
++  }
++  return pp::Var();
++}
++
++void* WesnothPepperInstance::ComputePi(void* param) {
++
++  printf("starting game thread\n");
++	wesnoth_main(0, NULL);
++
++  return NULL;
++}
++
++}  // namespace wesnoth_pepper
+diff --git a/ppapi/wesnoth_pepper_instance.h b/ppapi/wesnoth_pepper_instance.h
+new file mode 100644
+index 0000000..6426e70
+--- /dev/null
++++ b/ppapi/wesnoth_pepper_instance.h
+@@ -0,0 +1,121 @@
++// Copyright 2010 The Native Client Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can
++// be found in the LICENSE file.
++
++#ifndef EXAMPLES_WESNOTH_PEPPER_H_
++#define EXAMPLES_WESNOTH_PEPPER_H_
++
++#include <ppapi/cpp/graphics_2d.h>
++#include <ppapi/cpp/image_data.h>
++#include <ppapi/cpp/instance.h>
++#include <ppapi/cpp/rect.h>
++#include <ppapi/cpp/dev/scriptable_object_deprecated.h>
++#include <ppapi/cpp/size.h>
++#include <pthread.h>
++
++#include <map>
++#include <vector>
++
++namespace wesnoth_pepper {
++
++// The Instance class.  One of these exists for each instance of your NaCl
++// module on the web page.  The browser will ask the Module object to create
++// a new Instance for each occurence of the <embed> tag that has these
++// attributes:
++//     type="application/x-ppapi-nacl-srpc"
++//     nexes="ARM: wesnoth_pepper_arm.nexe
++//            ..."
++// The Instance can return a ScriptableObject representing itself.  When the
++// browser encounters JavaScript that wants to access the Instance, it calls
++// the GetInstanceObject() method.  All the scripting work is done though
++// the returned ScriptableObject.
++class WesnothPepperInstance : public pp::Instance {
++ public:
++  explicit WesnothPepperInstance(PP_Instance instance);
++  virtual ~WesnothPepperInstance();
++
++  // Start up the ComputePi() thread.
++  virtual bool Init(uint32_t argc, const char* argn[], const char* argv[]);
++
++  // Update the graphcs context to the new size, and regnerate |pixel_buffer_|
++  // to fit the new size as well.
++  virtual void DidChangeView(const pp::Rect& position, const pp::Rect& clip);
++
++  // The pp::Var takes over ownership of the returned script object.
++  virtual pp::Var GetInstanceObject();
++
++  virtual bool HandleInputEvent(const PP_InputEvent& event);
++
++  // Flushes its contents of |pixel_buffer_| to the 2D graphics context.  The
++  // ComputePi() thread fills in |pixel_buffer_| pixels as it computes Pi.
++  // This method is called in response to the "paint()" method being called
++  // from JavaScript.  Returns the current value of pi as computed by the
++  // Monte Carlo method.
++  pp::Var Paint();
++
++  bool quit() const {
++    return quit_;
++  }
++
++  // |pi_| is computed in the ComputePi() thread.
++  double pi() const {
++    return pi_;
++  }
++
++  // Indicate whether a flush is pending.  This can only be called from the
++  // main thread; it is not thread safe.
++  bool flush_pending() const {
++    return flush_pending_;
++  }
++  void set_flush_pending(bool flag) {
++    flush_pending_ = flag;
++  }
++
++ private:
++  // This class exposes the scripting interface for this NaCl module.  The
++  // HasMethod method is called by the browser when executing a method call on
++  // the |piGenerator| object (see, e.g. the paint() function in
++  // wesnoth_pepper.html).  The name of the JavaScript function (e.g. "paint") is
++  // passed in the |method| paramter as a string pp::Var.  If HasMethod()
++  // returns |true|, then the browser will call the Call() method to actually
++  // invoke the method.
++  class WesnothPepperInstanceScriptObject : public pp::deprecated::ScriptableObject {
++   public:
++    explicit WesnothPepperInstanceScriptObject(WesnothPepperInstance* app_instance)
++        : pp::deprecated::ScriptableObject(),
++          app_instance_(app_instance) {}
++    virtual ~WesnothPepperInstanceScriptObject() {}
++    // Return |true| if |method| is one of the exposed method names.
++    virtual bool HasMethod(const pp::Var& method, pp::Var* exception);
++
++    // Invoke the function associated with |method|.  The argument list passed
++    // in via JavaScript is marshaled into a vector of pp::Vars.  None of the
++    // functions in this example take arguments, so this vector is always empty.
++    virtual pp::Var Call(const pp::Var& method,
++                         const std::vector<pp::Var>& args,
++                         pp::Var* exception);
++   private:
++    WesnothPepperInstance* app_instance_;  // weak reference.
++  };
++
++  mutable pthread_mutex_t pixel_buffer_mutex_;
++  pp::Graphics2D* graphics_2d_context_;
++  pp::ImageData* pixel_buffer_;
++  bool flush_pending_;
++  bool quit_;
++  pthread_t compute_pi_thread_;
++  double pi_;
++  int width_;
++  int height_;
++
++  // ComputePi() estimates Pi using Monte Carlo method and it is executed by a
++  // separate thread created in SetWindow(). ComputePi() puts kMaxPointCount
++  // points inside the square whose length of each side is 1.0, and calculates
++  // the ratio of the number of points put inside the inscribed quadrant divided
++  // by the total number of random points to get Pi/4.
++  static void* ComputePi(void* param);
++};
++
++}  // namespace wesnoth_pepper
++
++#endif  // EXAMPLES_WESNOTH_PEPPER_H_
+diff --git a/ppapi/wesnoth_pepper_module.cc b/ppapi/wesnoth_pepper_module.cc
+new file mode 100644
+index 0000000..f74f53e
+--- /dev/null
++++ b/ppapi/wesnoth_pepper_module.cc
+@@ -0,0 +1,34 @@
++// Copyright 2010 The Native Client SDK Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can
++// be found in the LICENSE file.
++
++#include <ppapi/cpp/module.h>
++#include <stdio.h>
++#include "wesnoth_pepper_instance.h"
++
++namespace wesnoth_pepper {
++// The Module class.  The browser calls the CreateInstance() method to create
++// an instance of you NaCl module on the web page.  The browser creates a new
++// instance for each <embed> tag with type="application/x-ppapi-nacl-srpc".
++class WesnothPepperModule : public pp::Module {
++ public:
++  WesnothPepperModule() : pp::Module() {}
++  virtual ~WesnothPepperModule() {}
++
++  virtual pp::Instance* CreateInstance(PP_Instance instance) {
++    return new WesnothPepperInstance(instance);
++  }
++};
++}  // namespace wesnoth_pepper
++
++// Factory function called by the browser when the module is first loaded.
++// The browser keeps a singleton of this module.  It calls the
++// CreateInstance() method on the object you return to make instances.  There
++// is one instance per <embed> tag on the page.  This is the main binding
++// point for your NaCl module with the browser.
++namespace pp {
++Module* CreateModule() {
++  printf("CreateModule\n");
++  return new wesnoth_pepper::WesnothPepperModule();
++}
++}  // namespace pp
+diff --git a/scons/config_check_utils.py b/scons/config_check_utils.py
+index b566791..5484ad5 100644
+--- a/scons/config_check_utils.py
++++ b/scons/config_check_utils.py
+@@ -14,5 +14,5 @@ def restore_env(env, backup):
+ 
+ def find_include(prefixes, include_file, include_subdir, default_prefixes = True):
+     if default_prefixes:
+-        prefixes = ["/usr", "/usr/local", "/sw", "/sw/local"] + prefixes
++        prefixes = prefixes + ["/usr", "/usr/local", "/sw", "/sw/local"]
+     return [(prefix, include) for prefix in prefixes for include in glob(join(prefix, "include", include_subdir, include_file))]
+diff --git a/src/SConscript b/src/SConscript
+index 1b61ede..9a01526 100644
+--- a/src/SConscript
++++ b/src/SConscript
+@@ -461,7 +461,7 @@ for env in [test_env, client_env, env]:
+ 
+ game_cpp = client_env.Object("game.cpp", EXTRA_DEFINE = not env["pool_alloc"] and "DISABLE_POOL_ALLOC" or None);
+ 
+-client_env.WesnothProgram("wesnoth", [game_cpp] + [libwesnoth_extras, libwesnoth_core, libwesnoth_sdl, libwesnoth, env["wesnoth_res"]], have_client_prereqs)
++client_env.WesnothProgram("wesnoth", [game_cpp] + [libwesnoth_extras, libwesnoth_core, libwesnoth_sdl, libwesnoth, libwesnoth_ppapi, env["wesnoth_res"]], have_client_prereqs)
+ 
+ campaignd_sources = Split("""
+     server/input_stream.cpp
+diff --git a/src/game.cpp b/src/game.cpp
+index 580e545..985a976 100644
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -2403,7 +2403,7 @@ void init_custom_malloc();
+ }
+ #endif
+ 
+-int main(int argc, char** argv)
++int wesnoth_main(int argc, char** argv)
+ {
+ #ifndef DISABLE_POOL_ALLOC
+ 	init_custom_malloc();
+@@ -2461,4 +2461,3 @@ int main(int argc, char** argv)
+ 
+ 	return 0;
+ } // end main
+-
