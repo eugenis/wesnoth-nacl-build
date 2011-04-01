@@ -28,5 +28,7 @@ But as it is a header-only library, that is not a problem until you start buildi
 
 There is something wrong with threads in glib-nacl: run pangoview (from pango-nacl) and see an assertion failure.
 
+SDL_mixer has to be built with Ogg Vorbis support (runtime dependency).
+
 There are surely more problems that I do not know of yet.
 
