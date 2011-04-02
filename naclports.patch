@@ -1,7 +1,19 @@
-Index: packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch
+Index: scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.sh
 ===================================================================
---- packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(revision 185)
-+++ packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(working copy)
+--- scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.sh	(revision 185)
++++ scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.sh	(working copy)
+@@ -48,6 +48,7 @@
+   export PKG_CONFIG_PATH=${NACL_SDK_USR_LIB}/pkgconfig
+   export PKG_CONFIG_LIBDIR=${NACL_SDK_USR_LIB}
+   export PATH=${NACL_BIN_PATH}:${NACL_SDK_USR}/bin:${PATH};
++  export CFLAGS="-g -O0"
+   ChangeDir ${NACL_PACKAGES_REPOSITORY}/${PACKAGE_NAME}
+   cd ${PACKAGE_NAME}-build
+   # We'll not build host anyway
+Index: scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch
+===================================================================
+--- scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(revision 185)
++++ scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch	(working copy)
 @@ -10,3 +10,14 @@
   
   EXTRA_DIST = fontconfig.pc.in fonts.conf.in fonts.dtd \
@@ -17,10 +29,10 @@ Index: packages/scripts/fontconfig-2.7.3/nacl-fontconfig-2.7.3.Makefile.patch
 + 
 + /* Define to 1 if you have the `lrand48' function. */
 + #define HAVE_LRAND48 1
-Index: packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch
+Index: scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch
 ===================================================================
---- packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(revision 185)
-+++ packages/scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(working copy)
+--- scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(revision 185)
++++ scripts/cairo-1.8.8/nacl-cairo-1.8.8.patch	(working copy)
 @@ -1,6 +1,6 @@
 -diff -Naur cairo-1.8.8/build/config.sub cairo-1.8.8.nacl/build/config.sub
 ---- cairo-1.8.8/build/config.sub	2009-05-05 01:45:31.000000000 -0700
