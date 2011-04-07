@@ -1,12 +1,13 @@
 diff --git a/SConstruct b/SConstruct
-index ff91c69..f277be8 100755
+index ff91c69..c34a63e 100755
 --- a/SConstruct
 +++ b/SConstruct
-@@ -282,6 +282,13 @@ if env["prereqs"]:
+@@ -282,6 +282,14 @@ if env["prereqs"]:
      conf.CheckLib("m")
      conf.CheckFunc("round")
  
 +    if env['host'] == 'nacl64':
++      env.Append(LINKFLAGS = ['-static', '-T',  'ldscripts/elf64_nacl.x.static'])
 +      env.Append(LINKFLAGS = ['-Wl,--undefined=_ZN2pp12CreateModuleEv'])
 +      env.Append(LIBS = ['-lpthread', '-lSDL', '-ldl', '-lppapi_cpp', '-ljpeg',
 +                         '-lpng', '-ltiff', '-lexpat', '-lpixman-1',
@@ -16,7 +17,7 @@ index ff91c69..f277be8 100755
      have_server_prereqs = \
          conf.CheckCPlusPlus(gcc_version = "3.3") and \
          conf.CheckGettextLibintl() and \
-@@ -349,6 +356,11 @@ else:
+@@ -349,6 +357,11 @@ else:
      test_env = env.Clone()
      client_env = env.Clone()
  
@@ -28,7 +29,7 @@ index ff91c69..f277be8 100755
  have_msgfmt = env["MSGFMT"]
  if not have_msgfmt:
       env["nls"] = False
-@@ -362,7 +374,7 @@ if not env['nls']:
+@@ -362,7 +375,7 @@ if not env['nls']:
  #
  
  for env in [test_env, client_env, env]:
@@ -37,7 +38,7 @@ index ff91c69..f277be8 100755
  
      env.Append(CPPDEFINES = ["HAVE_CONFIG_H"])
  
-@@ -433,7 +445,7 @@ else:
+@@ -433,7 +446,7 @@ else:
          env["svnrev"] = ""
  
  Export(Split("env client_env test_env have_client_prereqs have_server_prereqs have_test_prereqs"))
@@ -48,7 +49,7 @@ index ff91c69..f277be8 100755
  builds = {
 diff --git a/build.sh b/build.sh
 new file mode 100755
-index 0000000..17628c7
+index 0000000..106108d
 --- /dev/null
 +++ b/build.sh
 @@ -0,0 +1,24 @@
@@ -60,7 +61,7 @@ index 0000000..17628c7
 +
 +# export SDL_LIBS="-L$ROOT/nacl64/usr/lib -lSDL -lppapi_cpp -lpthread -lm"
 +
-+PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j3 host=nacl64 \
++PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j15 host=nacl64 \
 +  prefix=$ROOT/nacl64/usr boostdir=$ROOT/nacl64/usr/include/boost \
 +  boostlibdir=$ROOT/nacl64/usr/lib sdldir=$ROOT/nacl64/usr nls=no \
 +  default_targets=wesnoth
@@ -99,16 +100,12 @@ index 0000000..59ddb6c
 +libwesnoth_ppapi = env.Library("wesnoth_ppapi", libwesnoth_ppapi_sources)
 +
 +Export("libwesnoth_ppapi")
-diff --git a/ppapi/libwesnoth_ppapi.a b/ppapi/libwesnoth_ppapi.a
-new file mode 100644
-index 0000000..4315220
-Binary files /dev/null and b/ppapi/libwesnoth_ppapi.a differ
 diff --git a/ppapi/wesnoth_pepper_instance.cc b/ppapi/wesnoth_pepper_instance.cc
 new file mode 100644
-index 0000000..6692fe7
+index 0000000..d11b215
 --- /dev/null
 +++ b/ppapi/wesnoth_pepper_instance.cc
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,139 @@
 +// Copyright 2010 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can
 +// be found in the LICENSE file.
@@ -172,8 +169,10 @@ index 0000000..6692fe7
 +void WesnothPepperInstance::DidChangeView(const pp::Rect& position,
 +                                const pp::Rect& clip) {
 +
-+  printf("did change view, new %dx%d, old %dx%d\n", position.size().width(), position.size().height(),
++  fprintf(stderr, "did change view, new %dx%d, old %dx%d\n", position.size().width(), position.size().height(),
 +      width_, height_);
++  fflush(stderr);
++  fsync(fileno(stderr));
 +
 +  if (width_ && height_)
 +    return;
@@ -187,8 +186,8 @@ index 0000000..6692fe7
 +
 +  printf("didchangeview, instance %p %p\n", this, static_cast<pp::Instance*>(this));
 +  SDL_NACL_SetInstance(pp_instance(), width_, height_);
-+  // int lval = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
-+  int lval = SDL_Init(SDL_INIT_VIDEO);
++  int lval = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
++  // int lval = SDL_Init(SDL_INIT_VIDEO);
 +  assert(lval >= 0);
 +  pthread_create(&compute_pi_thread_, NULL, ComputePi, this);
 +}
@@ -238,8 +237,9 @@ index 0000000..6692fe7
 +
 +void* WesnothPepperInstance::ComputePi(void* param) {
 +
++  static char const * argv[] = {"wesnoth", NULL};
 +  printf("starting game thread\n");
-+	wesnoth_main(0, NULL);
++  wesnoth_main(1, (char**)argv);
 +
 +  return NULL;
 +}
@@ -372,10 +372,6 @@ index 0000000..6426e70
 +}  // namespace wesnoth_pepper
 +
 +#endif  // EXAMPLES_WESNOTH_PEPPER_H_
-diff --git a/ppapi/wesnoth_pepper_instance.o b/ppapi/wesnoth_pepper_instance.o
-new file mode 100644
-index 0000000..3e70f23
-Binary files /dev/null and b/ppapi/wesnoth_pepper_instance.o differ
 diff --git a/ppapi/wesnoth_pepper_module.cc b/ppapi/wesnoth_pepper_module.cc
 new file mode 100644
 index 0000000..f74f53e
@@ -416,10 +412,6 @@ index 0000000..f74f53e
 +  return new wesnoth_pepper::WesnothPepperModule();
 +}
 +}  // namespace pp
-diff --git a/ppapi/wesnoth_pepper_module.o b/ppapi/wesnoth_pepper_module.o
-new file mode 100644
-index 0000000..35fb07a
-Binary files /dev/null and b/ppapi/wesnoth_pepper_module.o differ
 diff --git a/scons/config_check_utils.py b/scons/config_check_utils.py
 index b566791..5484ad5 100644
 --- a/scons/config_check_utils.py
