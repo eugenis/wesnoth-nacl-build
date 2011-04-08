@@ -1,4 +1,7 @@
 Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-sdk/bin).
+At the time of writing, the most working toolchain is r4777.
+
+If there is no nacl64/lib/libnosys.a in the toolchain, create an empty one.
 
 Build and install all naclports, don't forget the patch.
 NACL_TOOLCHAIN_ROOT=$HOME/root/nacl-sdk ./nacl-install-all-bitsize.sh 64
@@ -17,13 +20,4 @@ Get wesnoth-1.9.4 from official site, apply the patch (wesnoth-1.9.4-nacl.patch)
 Fix all remaining issues.
 
 PROFIT!
-
------------------------------------------------------------------------------------------
-
-Of course, you also need to build and install wesnoth. Unfortunately, that's not covered by
-this tutorial.
-
-SDL_mixer has to be built with Ogg Vorbis support (runtime dependency).
-
-There are surely more problems that I do not know of yet.
 
