@@ -50,7 +50,7 @@ index ff91c69..b80740d 100755
  builds = {
 diff --git a/build.sh b/build.sh
 new file mode 100755
-index 0000000..612a23a
+index 0000000..8e3ddc1
 --- /dev/null
 +++ b/build.sh
 @@ -0,0 +1,11 @@
@@ -63,7 +63,7 @@ index 0000000..612a23a
 +PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j15 host=nacl64 \
 +  prefix=$ROOT/nacl64/usr boostdir=$ROOT/nacl64/usr/include/boost \
 +  boostlibdir=$ROOT/nacl64/usr/lib sdldir=$ROOT/nacl64/usr nls=no \
-+  default_targets=wesnoth
++  build=debug wesnoth install
 +
 diff --git a/ppapi/SConscript b/ppapi/SConscript
 new file mode 100644

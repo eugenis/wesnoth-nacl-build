@@ -1,5 +1,6 @@
 Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-sdk/bin).
-At the time of writing, the most working toolchain is r4777.
+
+Grab nacl64/lib/libstdc++.a from toolchain r4777 and overwrite the one in the your toolchain with it.
 
 If there is no nacl64/lib/libnosys.a in the toolchain, create an empty one.
 
@@ -15,9 +16,29 @@ Most of them have a build.sh script in the repository root. "A -> B" mean B depe
   SDL_ttf
   SDL_net
 
-Get wesnoth-1.9.4 from official site, apply the patch (wesnoth-1.9.4-nacl.patch), run build.sh.
+Get wesnoth-1.9.5 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
 
-Fix all remaining issues.
 
-PROFIT!
+# Optional: Significantly reduces the amount of flood from sel_ldr.
+cp /etc/localtime $HOME/root/nacl-sdk/nacl64/etc/localtime
+
+# Optional(?): mkdir is not implemented in NaCl/GLibC at the moment
+mkdir -p ./.wesnoth1.9/editor/maps  ./.wesnoth1.9/data/add-ons ./.wesnoth1.9/saves ./.wesnoth1.9/persist
+
+# In the NaCl tree, build the loader
+./scons platform=x86-64 --mode=dbg-linux sel_universal sel_ldr sdl_sel_universal=1
+
+# Run wesnoth (for some reason it does not install the binary itself into the toolchain dir)
+scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- @WESNOTH_BUILD_DIR@/wesnoth-debug -d < src/trusted/sniversal/launch.stdin
+
+----------------
+
+It kind of works.
+
+* Very slow and the sound is glitchy, probably because of the busy loop in the SDL port (CallOnMainThread stuff).
+* For some reason it requests an 8-bit video mode from SDL. Colors look weird.
+* It crashes on exit.
+* Fontconfig looks for its files in the host system.
+* The resulting binary does not pass NaCl validator.
+* Need to package all required files and add some kind of a JS bridge to run this in the browser.
 
