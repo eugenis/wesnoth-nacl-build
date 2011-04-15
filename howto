@@ -26,10 +26,13 @@ cp /etc/localtime $HOME/root/nacl-sdk/nacl64/etc/localtime
 mkdir -p ./.wesnoth1.9/editor/maps  ./.wesnoth1.9/data/add-ons ./.wesnoth1.9/saves ./.wesnoth1.9/persist
 
 # In the NaCl tree, build the loader
-./scons platform=x86-64 --mode=dbg-linux sel_universal sel_ldr sdl_sel_universal=1
+./scons platform=x86-64 --mode=dbg-linux sel_universal sel_ldr ncval_stubout sdl_sel_universal=1
 
-# Run wesnoth (for some reason it does not install the binary itself into the toolchain dir)
-scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- @WESNOTH_BUILD_DIR@/wesnoth-debug -d < src/trusted/sniversal/launch.stdin
+# Stub out all invalid instructions in the wesnoth binary.
+./scons-out/dbg-linux-x86-64/staging/ncval_stubout @WESNOTH_BUILD_DIR@/wesnoth-debug -o wesnoth-debug-stubout
+
+# Run wesnoth
+scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout -d < src/trusted/sniversal/launch.stdin
 
 ----------------
 
@@ -39,6 +42,7 @@ It kind of works.
 * For some reason it requests an 8-bit video mode from SDL. Colors look weird.
 * It crashes on exit.
 * Fontconfig looks for its files in the host system.
-* The resulting binary does not pass NaCl validator.
+* The resulting binary does not pass NaCl validator. It does after ncval_stubout!
 * Need to package all required files and add some kind of a JS bridge to run this in the browser.
+* I see an empty square in place of the introduction text at the start of the first campain. Does not prevent you from playing, all controls work fine.
 
