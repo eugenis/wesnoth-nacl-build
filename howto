@@ -46,3 +46,10 @@ It kind of works.
 * Need to package all required files and add some kind of a JS bridge to run this in the browser.
 * I see an empty square in place of the introduction text at the start of the first campain. Does not prevent you from playing, all controls work fine.
 
+---------------
+
+As there is no support for opendir() in NaCl (at least for now), preprocess.py script can be used to resolve includes in Wesnoth's *.cfg.
+Usage:
+mv usr/share/wesnoth/data/hardwired/language.cfg usr/share/wesnoth/data/hardwired/language.cfg.orig
+./preprocess.py usr/share/wesnoth/data/hardwired/language.cfg.orig usr/share/wesnoth/data >usr/share/wesnoth/data/hardwired/language.cfg
+
