@@ -38,6 +38,9 @@ scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout
 
 It kind of works.
 
+* In Chrome there is an issue with leaking fds. In seems like they are garbage
+  collected occasionally, but the default ulimit of 1024 open files in not
+  enough. 5-10K should work.
 * The sound is glitchy in sel_universal, perfect in Chrome.
 * Strange video artifacts. Could be related to the incorrect handling of premultipied alpha in SDL/NaCl.
 * Fontconfig needs real stat().
