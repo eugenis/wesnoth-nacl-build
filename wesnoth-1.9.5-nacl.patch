@@ -1,5 +1,5 @@
 diff --git a/SConstruct b/SConstruct
-index ff91c69..b80740d 100755
+index ff91c69..09b8a73 100755
 --- a/SConstruct
 +++ b/SConstruct
 @@ -282,6 +282,15 @@ if env["prereqs"]:
@@ -7,7 +7,7 @@ index ff91c69..b80740d 100755
      conf.CheckFunc("round")
  
 +    if env['host'] == 'nacl64':
-+      env.Append(LINKFLAGS = ['-static', '-T',  'ldscripts/elf64_nacl.x.static'])
++#      env.Append(LINKFLAGS = ['-static', '-T',  'ldscripts/elf64_nacl.x.static'])
 +      env.Append(LINKFLAGS = ['-Wl,--undefined=_ZN2pp12CreateModuleEv'])
 +      env.Append(LIBS = ['-lpthread', '-lSDL', '-ldl', '-lppapi_cpp', '-ljpeg',
 +                         '-lpng', '-ltiff', '-lexpat', '-lpixman-1',
@@ -50,7 +50,7 @@ index ff91c69..b80740d 100755
  builds = {
 diff --git a/build.sh b/build.sh
 new file mode 100755
-index 0000000..8e3ddc1
+index 0000000..b6d1ce3
 --- /dev/null
 +++ b/build.sh
 @@ -0,0 +1,11 @@
@@ -60,17 +60,17 @@ index 0000000..8e3ddc1
 +ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
 +PATH=$ROOT/bin:$ROOT/nacl64/usr/bin:$PATH
 +
-+PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j15 host=nacl64 \
-+  prefix=$ROOT/nacl64/usr boostdir=$ROOT/nacl64/usr/include/boost \
++PKG_CONFIG_PATH=$ROOT/nacl64/usr/lib/pkgconfig scons -j5 host=nacl64 \
++  boostdir=$ROOT/nacl64/usr/include/boost \
 +  boostlibdir=$ROOT/nacl64/usr/lib sdldir=$ROOT/nacl64/usr nls=no \
-+  build=debug wesnoth install
-+
++  destdir=$ROOT/nacl64 \
++  build=debug wesnoth # install
 diff --git a/ppapi/SConscript b/ppapi/SConscript
 new file mode 100644
-index 0000000..59ddb6c
+index 0000000..3ac34f7
 --- /dev/null
 +++ b/ppapi/SConscript
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +import commands, os
 +from subprocess import Popen, PIPE
 +from glob import glob
@@ -83,11 +83,98 @@ index 0000000..59ddb6c
 +libwesnoth_ppapi_sources = Split("""
 +    wesnoth_pepper_instance.cc
 +    wesnoth_pepper_module.cc
++    nacl_dir.cc
 +    """)
 +
 +libwesnoth_ppapi = env.Library("wesnoth_ppapi", libwesnoth_ppapi_sources)
 +
 +Export("libwesnoth_ppapi")
+diff --git a/ppapi/nacl_dir.cc b/ppapi/nacl_dir.cc
+new file mode 100644
+index 0000000..49e2dea
+--- /dev/null
++++ b/ppapi/nacl_dir.cc
+@@ -0,0 +1,59 @@
++#include "nacl_dir.h"
++
++#include <string>
++#include <string.h>
++
++NACL_DIR* nacl_opendir(const char* fname) {
++  std::string dot_dir_name = fname;
++  dot_dir_name += "/.dir";
++  FILE* fp = fopen(dot_dir_name.c_str(), "r");
++  if (!fp) {
++    fprintf(stderr, "opendir(%s), missing\n", fname);
++    return NULL;
++  }
++  NACL_DIR* dir = new NACL_DIR();
++  dir->fp = fp;
++  memset(&dir->dirent_, 0, sizeof(dir->dirent_));
++  fprintf(stderr, "opendir(%s), success\n", fname);
++  return dir;
++}
++
++struct dirent* nacl_readdir(NACL_DIR* dirp) {
++  char* res = fgets(dirp->dirent_.d_name, sizeof(dirp->dirent_.d_name), dirp->fp);
++  if (!res)
++    return NULL;
++  // Replace the trailing \n with \0.
++  char* p = res + strlen(res) - 1;
++  if (p >= res && *p == '\n')
++    *p = 0;
++  return &(dirp->dirent_);
++}
++
++int nacl_closedir(NACL_DIR* dirp) {
++  fclose(dirp->fp);
++  delete dirp;
++  return 0;
++}
++
++int nacl_stat(const char *path, struct stat *buf) {
++  std::string dot_dir_name = path;
++  dot_dir_name += "/.dir";
++  FILE* fp = fopen(dot_dir_name.c_str(), "r");
++  if (fp) {
++    fclose(fp);
++    memset(buf, 0, sizeof(*buf));
++    buf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
++    fprintf(stderr, "stat(%s), dir\n", path);
++    return 0;
++  }
++  fp = fopen(path, "r");
++  if (fp) {
++    fclose(fp);
++    memset(buf, 0, sizeof(*buf));
++    buf->st_mode = S_IFREG | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
++    fprintf(stderr, "stat(%s), file\n", path);
++    return 0;
++  }
++  fprintf(stderr, "stat(%s), none\n", path);
++  return -1;
++}
+diff --git a/ppapi/nacl_dir.h b/ppapi/nacl_dir.h
+new file mode 100644
+index 0000000..afaca3f
+--- /dev/null
++++ b/ppapi/nacl_dir.h
+@@ -0,0 +1,15 @@
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <dirent.h>
++#include <stdio.h>
++
++typedef struct {
++  FILE* fp;
++  struct dirent dirent_;
++} NACL_DIR;
++
++NACL_DIR* nacl_opendir(const char* fname);
++struct dirent* nacl_readdir(NACL_DIR* dirp);
++int nacl_closedir(NACL_DIR* dirp);
++int nacl_stat(const char *path, struct stat *buf);
 diff --git a/ppapi/wesnoth_pepper_instance.cc b/ppapi/wesnoth_pepper_instance.cc
 new file mode 100644
 index 0000000..d11b215
@@ -424,6 +511,276 @@ index 1b61ede..9a01526 100644
  
  campaignd_sources = Split("""
      server/input_stream.cpp
+diff --git a/src/filesystem.cpp b/src/filesystem.cpp
+index 028ff43..33e197e 100644
+--- a/src/filesystem.cpp
++++ b/src/filesystem.cpp
+@@ -54,6 +54,8 @@ BPath be_path;
+ // for strerror
+ #include <cstring>
+ 
++#include "ppapi/nacl_dir.h"
++
+ #include "config.hpp"
+ #include "filesystem.hpp"
+ #include "foreach.hpp"
+@@ -90,6 +92,7 @@ bool ends_with(const std::string& str, const std::string& suffix)
+ 	return str.size() >= suffix.size() && std::equal(suffix.begin(),suffix.end(),str.end()-suffix.size());
+ }
+ 
++
+ void get_files_in_dir(const std::string &directory,
+ 					  std::vector<std::string>* files,
+ 					  std::vector<std::string>* dirs,
+@@ -98,6 +101,7 @@ void get_files_in_dir(const std::string &directory,
+ 					  file_reorder_option reorder,
+ 					  file_tree_checksum* checksum)
+ {
++  std::cerr << "get_files_in_dir: " << directory << "\n";
+ 	// If we have a path to find directories in,
+ 	// then convert relative pathnames to be rooted
+ 	// on the wesnoth path
+@@ -125,7 +129,7 @@ void get_files_in_dir(const std::string &directory,
+ 		else
+ 			maincfg = (directory + "/") + maincfg_filename;
+ 
+-		if (::stat(maincfg.c_str(), &st) != -1) {
++		if (nacl_stat(maincfg.c_str(), &st) != -1) {
+ 			LOG_FS << "_main.cfg found : " << maincfg << '\n';
+ 			if (files != NULL) {
+ 				if (mode == ENTIRE_FILE_PATH)
+@@ -137,14 +141,14 @@ void get_files_in_dir(const std::string &directory,
+ 		}
+ 	}
+ 
+-	DIR* dir = opendir(directory.c_str());
++	NACL_DIR* dir = nacl_opendir(directory.c_str());
+ 
+ 	if(dir == NULL) {
+ 		return;
+ 	}
+ 
+ 	struct dirent* entry;
+-	while((entry = readdir(dir)) != NULL) {
++	while((entry = nacl_readdir(dir)) != NULL) {
+ 		if(entry->d_name[0] == '.')
+ 			continue;
+ #ifdef __APPLE__
+@@ -178,7 +182,7 @@ void get_files_in_dir(const std::string &directory,
+ 		else
+ 			fullname = directory + "/" + basename;
+ 
+-		if (::stat(fullname.c_str(), &st) != -1) {
++		if (nacl_stat(fullname.c_str(), &st) != -1) {
+ 			if (S_ISREG(st.st_mode)) {
+ 				if (files != NULL) {
+ 					if (mode == ENTIRE_FILE_PATH)
+@@ -199,7 +203,7 @@ void get_files_in_dir(const std::string &directory,
+ 					continue;
+ 
+ 				if (reorder == DO_REORDER &&
+-						::stat((fullname+"/"+maincfg_filename).c_str(), &st)!=-1 &&
++						nacl_stat((fullname+"/"+maincfg_filename).c_str(), &st)!=-1 &&
+ 						S_ISREG(st.st_mode)) {
+ 					LOG_FS << "_main.cfg found : ";
+ 					if (files != NULL) {
+@@ -224,7 +228,7 @@ void get_files_in_dir(const std::string &directory,
+ 		}
+ 	}
+ 
+-	closedir(dir);
++	nacl_closedir(dir);
+ 
+ 	if(files != NULL)
+ 		std::sort(files->begin(),files->end());
+@@ -327,11 +331,11 @@ std::string get_next_filename(const std::string& name, const std::string& extens
+ 
+ std::string get_dir(const std::string& dir_path)
+ {
+-	DIR* dir = opendir(dir_path.c_str());
++	NACL_DIR* dir = nacl_opendir(dir_path.c_str());
+ 	if(dir == NULL) {
+ 		const int res = mkdir(dir_path.c_str(),AccessMode);
+ 		if(res == 0) {
+-			dir = opendir(dir_path.c_str());
++			dir = nacl_opendir(dir_path.c_str());
+ 		} else {
+ 			ERR_FS << "could not open or create directory: " << dir_path << '\n';
+ 		}
+@@ -340,7 +344,7 @@ std::string get_dir(const std::string& dir_path)
+ 	if(dir == NULL)
+ 		return "";
+ 
+-	closedir(dir);
++	nacl_closedir(dir);
+ 
+ 	return dir_path;
+ }
+@@ -595,12 +599,12 @@ static void setup_user_data_dir()
+ 
+ 	const bool res = create_directory_if_missing(dir_path);
+ 	// probe read permissions (if we could make the directory)
+-	DIR* const dir = res ? opendir(dir_path.c_str()) : NULL;
++	NACL_DIR* const dir = res ? nacl_opendir(dir_path.c_str()) : NULL;
+ 	if(dir == NULL) {
+ 		ERR_FS << "could not open or create preferences directory at " << dir_path << '\n';
+ 		return;
+ 	}
+-	closedir(dir);
++	nacl_closedir(dir);
+ 
+ 	// Create user data and add-on directories
+ 	create_directory_if_missing(dir_path + "/editor");
+@@ -778,7 +782,7 @@ static bool is_directory_internal(const std::string& fname)
+ 
+ #else
+ 	struct stat dir_stat;
+-	if(::stat(fname.c_str(), &dir_stat) == -1) {
++	if(nacl_stat(fname.c_str(), &dir_stat) == -1) {
+ 		return false;
+ 	}
+ 	return S_ISDIR(dir_stat.st_mode);
+@@ -802,17 +806,17 @@ bool file_exists(const std::string& name)
+ {
+ #ifdef _WIN32
+        struct stat st;
+-       return (::stat(name.c_str(), &st) == 0);
++       return (nacl_stat(name.c_str(), &st) == 0);
+ #else
+ 	struct stat st;
+-	return (::stat(name.c_str(), &st) != -1);
++	return (nacl_stat(name.c_str(), &st) != -1);
+ #endif
+ }
+ 
+ time_t file_create_time(const std::string& fname)
+ {
+ 	struct stat buf;
+-	if(::stat(fname.c_str(),&buf) == -1)
++	if(nacl_stat(fname.c_str(),&buf) == -1)
+ 		return 0;
+ 
+ 	return buf.st_mtime;
+@@ -884,7 +888,7 @@ const file_tree_checksum& data_tree_checksum(bool reset)
+ int file_size(const std::string& fname)
+ {
+ 	struct stat buf;
+-	if(::stat(fname.c_str(),&buf) == -1)
++	if(nacl_stat(fname.c_str(),&buf) == -1)
+ 		return -1;
+ 
+ 	return buf.st_size;
+@@ -1027,10 +1031,10 @@ const std::vector<std::string>& get_binary_paths(const std::string& type)
+ 
+ std::string get_binary_file_location(const std::string& type, const std::string& filename)
+ {
+-	DBG_FS << "Looking for '" << filename << "'.\n";
++	ERR_FS << "Looking for '" << filename << "'.\n";
+ 
+ 	if (filename.empty()) {
+-		LOG_FS << "  invalid filename (type: " << type <<")\n";
++		ERR_FS << "  invalid filename (type: " << type <<")\n";
+ 		return std::string();
+ 	}
+ 
+@@ -1039,7 +1043,7 @@ std::string get_binary_file_location(const std::string& type, const std::string&
+ 	std::string::size_type pos = filename.rfind("../");
+ 	if (pos != std::string::npos) {
+ 		std::string nf = filename.substr(pos + 3);
+-		LOG_FS << "Illegal path '" << filename << "' replaced by '" << nf << "'\n";
++		ERR_FS << "Illegal path '" << filename << "' replaced by '" << nf << "'\n";
+ 		return get_binary_file_location(type, nf);
+ 	}
+ 
+@@ -1051,23 +1055,23 @@ std::string get_binary_file_location(const std::string& type, const std::string&
+ 	foreach (const std::string &path, get_binary_paths(type))
+ 	{
+ 		const std::string file = path + filename;
+-		DBG_FS << "  checking '" << path << "'\n";
++		ERR_FS << "  checking '" << path << "'\n";
+ 		if(file_exists(file)) {
+-			DBG_FS << "  found at '" << file << "'\n";
++			ERR_FS << "  found at '" << file << "'\n";
+ 			return file;
+ 		}
+ 	}
+ 
+-	DBG_FS << "  not found\n";
++	ERR_FS << "  not found\n";
+ 	return std::string();
+ }
+ 
+ std::string get_binary_dir_location(const std::string &type, const std::string &filename)
+ {
+-	DBG_FS << "Looking for '" << filename << "'.\n";
++	ERR_FS << "Looking for '" << filename << "'.\n";
+ 
+ 	if (filename.empty()) {
+-		LOG_FS << "  invalid filename (type: " << type <<")\n";
++		ERR_FS << "  invalid filename (type: " << type <<")\n";
+ 		return std::string();
+ 	}
+ 
+@@ -1079,25 +1083,25 @@ std::string get_binary_dir_location(const std::string &type, const std::string &
+ 	foreach (const std::string &path, get_binary_paths(type))
+ 	{
+ 		const std::string file = path + filename;
+-		DBG_FS << "  checking '" << path << "'\n";
++		ERR_FS << "  checking '" << path << "'\n";
+ 		if (is_directory(file)) {
+-			DBG_FS << "  found at '" << file << "'\n";
++			ERR_FS << "  found at '" << file << "'\n";
+ 			return file;
+ 		}
+ 	}
+ 
+-	DBG_FS << "  not found\n";
++	ERR_FS << "  not found\n";
+ 	return std::string();
+ }
+ 
+ std::string get_wml_location(const std::string &filename, const std::string &current_dir)
+ {
+-	DBG_FS << "Looking for '" << filename << "'.\n";
++	ERR_FS << "wml Looking for '" << filename << "'.\n";
+ 
+ 	std::string result;
+ 
+ 	if (filename.empty()) {
+-		LOG_FS << "  invalid filename\n";
++		ERR_FS << "  invalid filename\n";
+ 		return result;
+ 	}
+ 
+@@ -1112,7 +1116,7 @@ std::string get_wml_location(const std::string &filename, const std::string &cur
+ 	{
+ 		// If the filename starts with '~', look in the user data directory.
+ 		result = get_user_data_dir() + "/data/" + filename.substr(1);
+-		DBG_FS << "  trying '" << result << "'\n";
++		ERR_FS << "  trying '" << result << "'\n";
+ 
+ 		already_found = file_exists(result) || is_directory(result);
+ 	}
+@@ -1125,16 +1129,16 @@ std::string get_wml_location(const std::string &filename, const std::string &cur
+ 	else if (!game_config::path.empty())
+ 		result = game_config::path + "/data/" + filename;
+ 
+-	DBG_FS << "  trying '" << result << "'\n";
++	ERR_FS << "  trying '" << result << "'\n";
+ 
+ 	if (result.empty() ||
+ 	    (!already_found && !file_exists(result) && !is_directory(result)))
+ 	{
+-		DBG_FS << "  not found\n";
++		ERR_FS << "  not found\n";
+ 		result.clear();
+ 	}
+ 	else
+-		DBG_FS << "  found: '" << result << "'\n";
++		ERR_FS << "  found: '" << result << "'\n";
+ 
+ 	return result;
+ }
 diff --git a/src/game.cpp b/src/game.cpp
 index 580e545..985a976 100644
 --- a/src/game.cpp
@@ -442,3 +799,17 @@ index 580e545..985a976 100644
  	return 0;
  } // end main
 -
+diff --git a/src/language.cpp b/src/language.cpp
+index 08b20fd..1be9537 100644
+--- a/src/language.cpp
++++ b/src/language.cpp
+@@ -93,7 +93,8 @@ bool load_language_list()
+ 	try {
+ 		scoped_istream stream = preprocess_file(get_wml_location("hardwired/language.cfg"));
+ 		read(cfg, *stream);
+-	} catch(config::error &) {
++	} catch(config::error & e) {
++	  std::cerr << "caught config::error" << e.message << "\n";
+ 		return false;
+ 	}
+ 

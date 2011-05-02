@@ -38,18 +38,14 @@ scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout
 
 It kind of works.
 
-* Very slow and the sound is glitchy, probably because of the busy loop in the SDL port (CallOnMainThread stuff).
-* For some reason it requests an 8-bit video mode from SDL. Colors look weird.
-* It crashes on exit.
-* Fontconfig looks for its files in the host system.
+* The sound is glitchy in sel_universal, perfect in Chrome.
+* Strange video artifacts. Could be related to the incorrect handling of premultipied alpha in SDL/NaCl.
+* Fontconfig needs real stat().
+* Pango looks for its files in the host system. Results (together with FontConfig troubles) in garbage displayed instead of text.
 * The resulting binary does not pass NaCl validator. It does after ncval_stubout!
-* Need to package all required files and add some kind of a JS bridge to run this in the browser.
-* I see an empty square in place of the introduction text at the start of the first campain. Does not prevent you from playing, all controls work fine.
 
 ---------------
 
-As there is no support for opendir() in NaCl (at least for now), preprocess.py script can be used to resolve includes in Wesnoth's *.cfg.
-Usage:
-mv usr/share/wesnoth/data/hardwired/language.cfg usr/share/wesnoth/data/hardwired/language.cfg.orig
-./preprocess.py usr/share/wesnoth/data/hardwired/language.cfg.orig usr/share/wesnoth/data >usr/share/wesnoth/data/hardwired/language.cfg
+There is a quick and dirty opendir() and stat() support compiled into Wesnoth.
+It requires that indexdir.sh script is run in every directory that must be recognized as such. 
 
