@@ -91,85 +91,204 @@ index 0000000..3ac34f7
 +Export("libwesnoth_ppapi")
 diff --git a/ppapi/nacl_dir.cc b/ppapi/nacl_dir.cc
 new file mode 100644
-index 0000000..49e2dea
+index 0000000..0866455
 --- /dev/null
 +++ b/ppapi/nacl_dir.cc
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,181 @@
 +#include "nacl_dir.h"
 +
 +#include <string>
 +#include <string.h>
++#include <thread.hpp>
++
++#include <map>
++#include <set>
++#include <vector>
++
++typedef std::set<std::string> entries_t;
++typedef std::map<std::string, entries_t > dirs_t;
++
++struct NACL_DIR {
++  entries_t* entries;
++  entries_t::iterator next;
++  struct dirent dirent_;
++};
++
++
++static dirs_t dirs;
++static threading::mutex dirs_mutex;
++
++static std::string normalize_path(std::string path) {
++  size_t first = 0;
++  std::vector<std::string> parts;
++  while (first < path.size()) {
++    size_t next = path.find('/', first);
++    if (next == std::string::npos)
++      next = path.size();
++    std::string part = path.substr(first, next - first);
++    first = next + 1;
++    if (part == "..") {
++      if (parts.empty()) {
++	fprintf(stderr, "invalid path\n");
++	return "";
++      } else {
++	parts.pop_back();
++      }
++    } else if (part != "." && !part.empty()) {
++      parts.push_back(part);
++    }
++  }
++  std::string res;
++  for (unsigned i = 0; i < parts.size(); ++i) {
++    res += "/";
++    res += parts[i];
++  }
++  return res;
++}
++
++static void lazy_init_dirs(void) {
++  threading::lock lock(dirs_mutex);
++
++  static bool initialized = false;
++
++  if (initialized)
++    return;
++
++  FILE* fp = fopen("/.dirs", "r");
++  if (!fp) {
++    fprintf(stderr, "Could not read the directory index\n");
++    exit(1);
++  }
++
++  const int BUFSIZE = 1000;
++  char buf[BUFSIZE];
++  while (fgets(buf, BUFSIZE, fp)) {
++    // Replace the trailing \n with \0.
++    char* p = buf + strlen(buf) - 1;
++    if (p >= buf && *p == '\n')
++      *p = 0;
++
++    p = strrchr(buf, '/');
++    if (!p)
++      p = buf;
++    std::string dir_name(buf, p - buf);
++    std::string file_name(p + 1);
++    dir_name = normalize_path(dir_name);
++
++    entries_t& files = dirs[dir_name];
++    if (!file_name.empty()) {
++      files.insert(file_name);
++      // fprintf(stderr, "init: %s  /  %s\n", dir_name.c_str(), file_name.c_str());
++    }
++  }
++
++  fclose(fp);
++
++  fprintf(stderr, "nacl_dir initialized!\n");
++
++  initialized = true;
++}
++
 +
 +NACL_DIR* nacl_opendir(const char* fname) {
-+  std::string dot_dir_name = fname;
-+  dot_dir_name += "/.dir";
-+  FILE* fp = fopen(dot_dir_name.c_str(), "r");
-+  if (!fp) {
-+    fprintf(stderr, "opendir(%s), missing\n", fname);
++  lazy_init_dirs();
++
++  std::string path = normalize_path(fname);
++
++  // fprintf(stderr, "opendir(%s) ...\n", path.c_str());
++
++  if (path.empty())
++    return NULL;
++  if (path[path.size() - 1] == '/')
++    path.resize(path.size() - 1);
++
++  dirs_t::iterator it = dirs.find(path);
++  if (it == dirs.end()) {
++    // fprintf(stderr, "opendir: not found: %s\n", path.c_str());
 +    return NULL;
 +  }
++
 +  NACL_DIR* dir = new NACL_DIR();
-+  dir->fp = fp;
++  dir->entries = &it->second;
++  dir->next = dir->entries->begin();
 +  memset(&dir->dirent_, 0, sizeof(dir->dirent_));
-+  fprintf(stderr, "opendir(%s), success\n", fname);
++  // fprintf(stderr, "opendir(%s), success\n", fname);
 +  return dir;
 +}
 +
 +struct dirent* nacl_readdir(NACL_DIR* dirp) {
-+  char* res = fgets(dirp->dirent_.d_name, sizeof(dirp->dirent_.d_name), dirp->fp);
-+  if (!res)
++  if (dirp->next == dirp->entries->end())
 +    return NULL;
-+  // Replace the trailing \n with \0.
-+  char* p = res + strlen(res) - 1;
-+  if (p >= res && *p == '\n')
-+    *p = 0;
++  const std::string& file = *(dirp->next++);
++  strncpy(dirp->dirent_.d_name, file.c_str(), sizeof(dirp->dirent_.d_name));
 +  return &(dirp->dirent_);
 +}
 +
 +int nacl_closedir(NACL_DIR* dirp) {
-+  fclose(dirp->fp);
 +  delete dirp;
 +  return 0;
 +}
 +
-+int nacl_stat(const char *path, struct stat *buf) {
-+  std::string dot_dir_name = path;
-+  dot_dir_name += "/.dir";
-+  FILE* fp = fopen(dot_dir_name.c_str(), "r");
-+  if (fp) {
-+    fclose(fp);
++int nacl_stat(const char *cpath, struct stat *buf) {
++  lazy_init_dirs();
++
++  std::string path = normalize_path(cpath);
++
++  // fprintf(stderr, "stat(%s) ...\n", path.c_str());
++
++  if (path.empty())
++    return -1;
++  if (path[path.size() - 1] == '/')
++    path.resize(path.size() - 1);
++
++  dirs_t::iterator d_it = dirs.find(path);
++  if (d_it != dirs.end()) {
 +    memset(buf, 0, sizeof(*buf));
 +    buf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-+    fprintf(stderr, "stat(%s), dir\n", path);
++    // fprintf(stderr, "stat(%s), dir\n", path.c_str());
 +    return 0;
 +  }
-+  fp = fopen(path, "r");
-+  if (fp) {
-+    fclose(fp);
++
++  size_t last_div = path.rfind('/');
++  if (last_div == std::string::npos) {
++    fprintf(stderr, "No / in path\n");
++    return -1;
++  }
++
++  std::string dir_name = path.substr(0, last_div);
++  d_it = dirs.find(dir_name);
++  if (d_it == dirs.end()) {
++    // fprintf(stderr, "Dir not found: %s\n", dir_name.c_str());
++    return -1;
++  }
++
++  std::string file_name = path.substr(last_div + 1);
++  entries_t& entries = d_it->second;
++  entries_t::iterator e_it = entries.find(file_name);
++  if (e_it != entries.end()) {
 +    memset(buf, 0, sizeof(*buf));
 +    buf->st_mode = S_IFREG | S_IRUSR | S_IXUSR | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-+    fprintf(stderr, "stat(%s), file\n", path);
++    // fprintf(stderr, "stat(%s), file\n", path.c_str());
 +    return 0;
 +  }
-+  fprintf(stderr, "stat(%s), none\n", path);
++
++  // fprintf(stderr, "File not found in dir: %s  /  %s\n", dir_name.c_str(), file_name.c_str());
++
 +  return -1;
 +}
 diff --git a/ppapi/nacl_dir.h b/ppapi/nacl_dir.h
 new file mode 100644
-index 0000000..afaca3f
+index 0000000..a36d0e2
 --- /dev/null
 +++ b/ppapi/nacl_dir.h
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,12 @@
 +#include <sys/types.h>
 +#include <sys/stat.h>
 +#include <unistd.h>
 +#include <dirent.h>
 +#include <stdio.h>
 +
-+typedef struct {
-+  FILE* fp;
-+  struct dirent dirent_;
-+} NACL_DIR;
++struct NACL_DIR;
 +
 +NACL_DIR* nacl_opendir(const char* fname);
 +struct dirent* nacl_readdir(NACL_DIR* dirp);
@@ -512,7 +631,7 @@ index 1b61ede..9a01526 100644
  campaignd_sources = Split("""
      server/input_stream.cpp
 diff --git a/src/filesystem.cpp b/src/filesystem.cpp
-index 028ff43..33e197e 100644
+index 028ff43..3b3a789 100644
 --- a/src/filesystem.cpp
 +++ b/src/filesystem.cpp
 @@ -54,6 +54,8 @@ BPath be_path;
@@ -536,7 +655,7 @@ index 028ff43..33e197e 100644
  					  file_reorder_option reorder,
  					  file_tree_checksum* checksum)
  {
-+  std::cerr << "get_files_in_dir: " << directory << "\n";
++  // std::cerr << "get_files_in_dir: " << directory << "\n";
  	// If we have a path to find directories in,
  	// then convert relative pathnames to be rooted
  	// on the wesnoth path
@@ -675,7 +794,7 @@ index 028ff43..33e197e 100644
  std::string get_binary_file_location(const std::string& type, const std::string& filename)
  {
 -	DBG_FS << "Looking for '" << filename << "'.\n";
-+	ERR_FS << "Looking for '" << filename << "'.\n";
++	// ERR_FS << "Looking for '" << filename << "'.\n";
  
  	if (filename.empty()) {
 -		LOG_FS << "  invalid filename (type: " << type <<")\n";
@@ -697,23 +816,23 @@ index 028ff43..33e197e 100644
  	{
  		const std::string file = path + filename;
 -		DBG_FS << "  checking '" << path << "'\n";
-+		ERR_FS << "  checking '" << path << "'\n";
++		// ERR_FS << "  checking '" << path << "'\n";
  		if(file_exists(file)) {
 -			DBG_FS << "  found at '" << file << "'\n";
-+			ERR_FS << "  found at '" << file << "'\n";
++			// ERR_FS << "  found at '" << file << "'\n";
  			return file;
  		}
  	}
  
 -	DBG_FS << "  not found\n";
-+	ERR_FS << "  not found\n";
++	ERR_FS << "  not found: " << filename << "\n";
  	return std::string();
  }
  
  std::string get_binary_dir_location(const std::string &type, const std::string &filename)
  {
 -	DBG_FS << "Looking for '" << filename << "'.\n";
-+	ERR_FS << "Looking for '" << filename << "'.\n";
++	// ERR_FS << "Looking for '" << filename << "'.\n";
  
  	if (filename.empty()) {
 -		LOG_FS << "  invalid filename (type: " << type <<")\n";
@@ -726,23 +845,23 @@ index 028ff43..33e197e 100644
  	{
  		const std::string file = path + filename;
 -		DBG_FS << "  checking '" << path << "'\n";
-+		ERR_FS << "  checking '" << path << "'\n";
++		// ERR_FS << "  checking '" << path << "'\n";
  		if (is_directory(file)) {
 -			DBG_FS << "  found at '" << file << "'\n";
-+			ERR_FS << "  found at '" << file << "'\n";
++			// ERR_FS << "  found at '" << file << "'\n";
  			return file;
  		}
  	}
  
 -	DBG_FS << "  not found\n";
-+	ERR_FS << "  not found\n";
++	ERR_FS << "  not found: " << filename << "\n";
  	return std::string();
  }
  
  std::string get_wml_location(const std::string &filename, const std::string &current_dir)
  {
 -	DBG_FS << "Looking for '" << filename << "'.\n";
-+	ERR_FS << "wml Looking for '" << filename << "'.\n";
++	// ERR_FS << "wml Looking for '" << filename << "'.\n";
  
  	std::string result;
  
@@ -757,7 +876,7 @@ index 028ff43..33e197e 100644
  		// If the filename starts with '~', look in the user data directory.
  		result = get_user_data_dir() + "/data/" + filename.substr(1);
 -		DBG_FS << "  trying '" << result << "'\n";
-+		ERR_FS << "  trying '" << result << "'\n";
++		// ERR_FS << "  trying '" << result << "'\n";
  
  		already_found = file_exists(result) || is_directory(result);
  	}
@@ -766,21 +885,51 @@ index 028ff43..33e197e 100644
  		result = game_config::path + "/data/" + filename;
  
 -	DBG_FS << "  trying '" << result << "'\n";
-+	ERR_FS << "  trying '" << result << "'\n";
++	// ERR_FS << "  trying '" << result << "'\n";
  
  	if (result.empty() ||
  	    (!already_found && !file_exists(result) && !is_directory(result)))
  	{
 -		DBG_FS << "  not found\n";
-+		ERR_FS << "  not found\n";
++		// ERR_FS << "  not found\n";
  		result.clear();
  	}
- 	else
+-	else
 -		DBG_FS << "  found: '" << result << "'\n";
-+		ERR_FS << "  found: '" << result << "'\n";
++	// else
++	// 	ERR_FS << "  found: '" << result << "'\n";
  
  	return result;
  }
+diff --git a/src/font.cpp b/src/font.cpp
+index c2e4dfe..777d0c7 100644
+--- a/src/font.cpp
++++ b/src/font.cpp
+@@ -346,12 +346,18 @@ void manager::update_font_path() const
+ void manager::init() const
+ {
+ #ifdef CAIRO_HAS_FT_FONT
+-	if (!FcConfigAppFontAddDir(FcConfigGetCurrent(),
+-		reinterpret_cast<const FcChar8 *>((game_config::path + "/fonts").c_str())))
+-	{
+-		ERR_FT << "Could not load the true type fonts\n";
+-		throw error();
+-	}
++	// if (!FcConfigAppFontAddDir(FcConfigGetCurrent(),
++	// 	reinterpret_cast<const FcChar8 *>((game_config::path + "/fonts").c_str())))
++	// {
++	// 	ERR_FT << "Could not load the true type fonts\n";
++	// 	throw error();
++	// }
++  FcConfigAppFontAddFile(FcConfigGetCurrent(),
++			 reinterpret_cast<const FcChar8 *>((game_config::path + "/fonts/wqy-zenhei.ttc").c_str()));
++  FcConfigAppFontAddFile(FcConfigGetCurrent(),
++			 reinterpret_cast<const FcChar8 *>((game_config::path + "/fonts/DejaVuSans.ttf").c_str()));
++  FcConfigAppFontAddFile(FcConfigGetCurrent(),
++			 reinterpret_cast<const FcChar8 *>((game_config::path + "/fonts/Andagii.ttf").c_str()));
+ #endif
+ 
+ #if CAIRO_HAS_WIN32_FONT
 diff --git a/src/game.cpp b/src/game.cpp
 index 580e545..985a976 100644
 --- a/src/game.cpp
