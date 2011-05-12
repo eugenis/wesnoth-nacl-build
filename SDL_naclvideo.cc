@@ -41,9 +41,19 @@ static void flush(void* data, int32_t unused);
 static int NACL_VideoInit(_THIS, SDL_PixelFormat *vformat);
 static SDL_Rect **NACL_ListModes(_THIS, SDL_PixelFormat *format, Uint32 flags);
 static SDL_Surface *NACL_SetVideoMode(_THIS, SDL_Surface *current, int width, int height, int bpp, Uint32 flags);
-static int NACL_ShowWMCursor(_THIS, WMcursor *cursor);
 static void NACL_VideoQuit(_THIS);
 static void NACL_UpdateRects(_THIS, int numrects, SDL_Rect *rects);
+
+/* The implementation dependent data for the window manager cursor */
+struct WMcursor {
+  // Fake cursor data to fool SDL into not using its broken (as it seems) software cursor emulation.
+};
+
+static void NACL_FreeWMCursor(_THIS, WMcursor *cursor);
+static WMcursor *NACL_CreateWMCursor(_THIS,
+                Uint8 *data, Uint8 *mask, int w, int h, int hot_x, int hot_y);
+static int NACL_ShowWMCursor(_THIS, WMcursor *cursor);
+static void NACL_WarpWMCursor(_THIS, Uint16 x, Uint16 y);
 
 
 static int NACL_Available(void) {
@@ -107,10 +117,14 @@ static SDL_VideoDevice *NACL_CreateDevice(int devindex) {
   device->ListModes = NACL_ListModes;
   device->SetVideoMode = NACL_SetVideoMode;
   device->UpdateRects = NACL_UpdateRects;
-  device->ShowWMCursor = NACL_ShowWMCursor;
   device->VideoQuit = NACL_VideoQuit;
   device->InitOSKeymap = NACL_InitOSKeymap;
   device->PumpEvents = NACL_PumpEvents;
+
+  device->FreeWMCursor = NACL_FreeWMCursor;
+  device->CreateWMCursor = NACL_CreateWMCursor;
+  device->ShowWMCursor = NACL_ShowWMCursor;
+  device->WarpWMCursor = NACL_WarpWMCursor;
 
   device->free = NACL_DeleteDevice;
 
@@ -130,8 +144,8 @@ int NACL_VideoInit(_THIS, SDL_PixelFormat *vformat) {
 
   /* Determine the screen depth (use default 8-bit depth) */
   /* we change this during the SDL_SetVideoMode implementation... */
-  vformat->BitsPerPixel = 24;
-  vformat->BytesPerPixel = 3;
+  vformat->BitsPerPixel = 32;
+  vformat->BytesPerPixel = 4;
 
   _this->info.current_w = gNaclVideoWidth;
   _this->info.current_h = gNaclVideoHeight;
@@ -164,7 +178,7 @@ SDL_Surface *NACL_SetVideoMode(_THIS, SDL_Surface *current,
   SDL_memset(_this->hidden->buffer, 0, width * height * (bpp / 8));
 
   /* Allocate the new pixel format for the screen */
-  if ( ! SDL_ReallocFormat(current, bpp, 0xFF0000, 0xFF00, 0xFF, 0xFF000000) ) {
+  if ( ! SDL_ReallocFormat(current, bpp, 0xFF0000, 0xFF00, 0xFF, 0) ) {
     SDL_free(_this->hidden->buffer);
     _this->hidden->buffer = NULL;
     SDL_SetError("Couldn't allocate new pixel format for requested mode");
@@ -287,8 +301,20 @@ static void NACL_UpdateRects(_THIS, int numrects, SDL_Rect *rects) {
   //   fprintf(stderr, "========= UpdateRects(0)\n");
 }
 
+static void NACL_FreeWMCursor(_THIS, WMcursor *cursor) {
+  delete cursor;
+}
+
+static WMcursor *NACL_CreateWMCursor(_THIS,
+    Uint8 *data, Uint8 *mask, int w, int h, int hot_x, int hot_y) {
+  return new WMcursor();
+}
+
 static int NACL_ShowWMCursor(_THIS, WMcursor *cursor) {
   return 1; // Success!
+}
+
+static void NACL_WarpWMCursor(_THIS, Uint16 x, Uint16 y) {
 }
 
 /* Note:  If we are terminated, this could be called in the middle of
