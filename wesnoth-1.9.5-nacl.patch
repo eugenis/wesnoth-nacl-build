@@ -13,7 +13,7 @@ index ff91c69..09b8a73 100755
 +                         '-lpng', '-ltiff', '-lexpat', '-lpixman-1',
 +                         '-lvorbisfile', '-lvorbis', '-logg',
 +                         '-lppruntime', '-lplatform', '-lgio',
-+                         '-lsrpc', '-lnosys'])
++                         '-lsrpc'])
 +
      have_server_prereqs = \
          conf.CheckCPlusPlus(gcc_version = "3.3") and \

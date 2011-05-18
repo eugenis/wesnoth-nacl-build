@@ -1,14 +1,14 @@
 Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-sdk/bin).
 
-Grab nacl64/lib/libstdc++.a from toolchain r4777 and overwrite the one in the your toolchain with it.
-
-If there is no nacl64/lib/libnosys.a in the toolchain, create an empty one.
-
-Build and install all naclports, don't forget the patch.
+Build and install all naclports, don't forget the patch (naclports.patch).
 NACL_TOOLCHAIN_ROOT=$HOME/root/nacl-sdk ./nacl-install-all-bitsize.sh 64
 
+Then go to repository64/SDL-*, replace src/video/nacl/SDL_naclvideo* with files from this repo.
+The go to repository64/SDL-*/SDL-*-build and do "make && make install".
+
 Build and install the following packages from http://github.com/eugenis.
-Most of them have a build.sh script in the repository root. "A -> B" mean B depends on A.
+Most of them have a build.sh script in the repository root that expects NACL_TOOLCHAIN_ROOT set in the environment.
+"A -> B" mean B depends on A.
   bzip2 -> boost
   glib -> pango
   SDL_mixer
@@ -18,21 +18,41 @@ Most of them have a build.sh script in the repository root. "A -> B" mean B depe
 
 Get wesnoth-1.9.5 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
 
+There is an "install" commented out in the build.sh file because it is too slow to do on every incremental build.
+Uncomment it and run ./build.sh once.
 
-# Optional: Significantly reduces the amount of flood from sel_ldr.
-cp /etc/localtime $HOME/root/nacl-sdk/nacl64/etc/localtime
 
-# Optional(?): mkdir is not implemented in NaCl/GLibC at the moment
-mkdir -p ./.wesnoth1.9/editor/maps  ./.wesnoth1.9/data/add-ons ./.wesnoth1.9/saves ./.wesnoth1.9/persist
+# Optional: Significantly reduces the HTTP request flood (yes, you really need this extra "nacl64"!)
+mkdir -p $HOME/root/nacl-sdk/nacl64/nacl64/etc
+cp /etc/localtime $HOME/root/nacl-sdk/nacl64/nacl64/etc/localtime
 
-# In the NaCl tree, build the loader
-./scons platform=x86-64 --mode=dbg-linux sel_universal sel_ldr ncval_stubout sdl_sel_universal=1
+
+# Build a directory index. This is needed for opendir/readdir/closedir and stat to work over HTTP.
+cd $HOME/root/nacl-sdk/nacl64
+find usr/local/share/wesnoth/ >.dirs
+
 
 # Stub out all invalid instructions in the wesnoth binary.
-./scons-out/dbg-linux-x86-64/staging/ncval_stubout @WESNOTH_BUILD_DIR@/wesnoth-debug -o wesnoth-debug-stubout
+cd $HOME/root/nacl-sdk/nacl64
+/path/to/ncval_stubout /path/to/wesnoth/build/wesnoth-debug -o wesnoth-debug
 
-# Run wesnoth
-scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout -d < src/trusted/sniversal/launch.stdin
+
+# Run the web server
+cd $HOME/root/nacl-sdk/nacl64
+python -m SimpleHTTPServer 8000
+
+
+Checkout Chrome, patch it with chromium.patch, build.
+
+
+Make sure that ulimit -n is high enough. 32768 is ok, 1024 is not.
+
+# Run chrome with various experimental features enabled.
+
+NACL_ENABLE_EXPERIMENTAL_JAVASCRIPT_APIS=1 \
+NACL_LD_ACCEPTS_PLUGIN_CONNECTION=1 \
+./chrome \
+--user-data-dir=/tmp/ggg
 
 ----------------
 
@@ -41,14 +61,22 @@ It kind of works.
 * In Chrome there is an issue with leaking fds. In seems like they are garbage
   collected occasionally, but the default ulimit of 1024 open files in not
   enough. 5-10K should work.
-* The sound is glitchy in sel_universal, perfect in Chrome.
-* Strange video artifacts. Could be related to the incorrect handling of premultipied alpha in SDL/NaCl.
-* Fontconfig needs real stat().
-* Pango looks for its files in the host system. Results (together with FontConfig troubles) in garbage displayed instead of text.
+* The sound is glitchy in sel_universal (lat time I checked), perfect in Chrome.
+* Fontconfig needs real stat(). For now we just enumerate all available fonts (all 3 of them) manually.
 * The resulting binary does not pass NaCl validator. It does after ncval_stubout!
+* Naturally, saving does not work.
+* An extra software cursor is displayed. Can be disabled in Preferences (display > show color cursors).
+
+----------------
+
+This is how you run Wesnoth with sel_universal (SDL-based PPAPI implementation). Does not work at the moment.
+
+# In the NaCl tree, build the loader
+./scons platform=x86-64 --mode=dbg-linux sel_universal sel_ldr ncval_stubout sdl_sel_universal=1
+
+# Run wesnoth
+scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout -d < src/trusted/sniversal/launch.stdin
+
 
 ---------------
-
-There is a quick and dirty opendir() and stat() support compiled into Wesnoth.
-It requires that indexdir.sh script is run in every directory that must be recognized as such. 
 
