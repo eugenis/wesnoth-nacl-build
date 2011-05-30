@@ -279,11 +279,7 @@ static void NACL_UpdateRects(_THIS, int numrects, SDL_Rect *rects) {
       dst += pitch;
     }
     _this->hidden->updated_rects.push_back(rects[i]);
-  }      
-
-
-  // SDL_memcpy(_this->hidden->image_data->data(), _this->hidden->buffer,
-  //     _this->hidden->w * _this->hidden->h * _this->hidden->bpp / 8);
+  }
 
   // Clear alpha channel in the ImageData.
   unsigned char* start = (unsigned char*)_this->hidden->image_data->data();
