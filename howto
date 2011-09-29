@@ -1,73 +1,35 @@
-Install nacl toolchain in $HOME/root/ (so that compilers are in $HOME/root/nacl-sdk/bin).
+Get the nacl-sdk. Setup NACL_SDK_ROOT and NACL_TOOLCHAIN_ROOT (to the glibc toolchain in pepper15/toolchain/linux_x86).
 
-Build and install all naclports, don't forget the patch (naclports.patch).
-NACL_TOOLCHAIN_ROOT=$HOME/root/nacl-sdk ./nacl-install-all-bitsize.sh 64
-
-Then go to repository64/SDL-*, replace src/video/nacl/SDL_naclvideo* with files from this repo.
-The go to repository64/SDL-*/SDL-*-build and do "make && make install".
-
-Build and install the following packages from http://github.com/eugenis.
-Most of them have a build.sh script in the repository root that expects NACL_TOOLCHAIN_ROOT set in the environment.
-"A -> B" mean B depends on A.
-  bzip2 -> boost
-  glib -> pango
-  SDL_mixer
-  SDL_image
-  SDL_ttf
-  SDL_net
+Build and install all naclports.
+make NACL_GLIBC=1 NACL_PACKAGES_BITSIZE=64 make
+At the moment ffmpeg fails compilation with glibc. Just delete if from the Makefile if that's the case.
 
 Get wesnoth-1.9.5 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
 
 There is an "install" commented out in the build.sh file because it is too slow to do on every incremental build.
 Uncomment it and run ./build.sh once.
 
-
-# Optional: Significantly reduces the HTTP request flood (yes, you really need this extra "nacl64"!)
-mkdir -p $HOME/root/nacl-sdk/nacl64/nacl64/etc
-cp /etc/localtime $HOME/root/nacl-sdk/nacl64/nacl64/etc/localtime
+Then do some file indexing magic that's too complex to describe here ;)
+Patch adds two scripts that do a part of it.
 
 
-# Build a directory index. This is needed for opendir/readdir/closedir and stat to work over HTTP.
-cd $HOME/root/nacl-sdk/nacl64
-find usr/local/share/wesnoth/ >.dirs
-
-
-# Stub out all invalid instructions in the wesnoth binary.
-cd $HOME/root/nacl-sdk/nacl64
-/path/to/ncval_stubout /path/to/wesnoth/build/wesnoth-debug -o wesnoth-debug
-
-
-# Run the web server
-cd $HOME/root/nacl-sdk/nacl64
+# Go to the toolchain dir and run the web server
 python -m SimpleHTTPServer 8000
 
+Run chrome and navigate to wesnoth.html.
 
-Checkout Chrome, patch it with chromium.patch, build.
-
-
-Make sure that ulimit -n is high enough. 32768 is ok, 1024 is not.
-
-# Run chrome with various experimental features enabled.
-
-NACL_ENABLE_EXPERIMENTAL_JAVASCRIPT_APIS=1 \
-NACL_LD_ACCEPTS_PLUGIN_CONNECTION=1 \
-./chrome \
---user-data-dir=/tmp/ggg
 
 ----------------
 
 It kind of works.
 
-* In Chrome there is an issue with leaking fds. In seems like they are garbage
-  collected occasionally, but the default ulimit of 1024 open files in not
-  enough. 5-10K should work.
-* The sound is glitchy in sel_universal (lat time I checked), perfect in Chrome.
-* Fontconfig needs real stat(). For now we just enumerate all available fonts (all 3 of them) manually.
-* The resulting binary does not pass NaCl validator. It does after ncval_stubout!
-* Naturally, saving does not work.
+* Saving works to the in-memory file system!
 * An extra software cursor is displayed. Can be disabled in Preferences (display > show color cursors).
 
 ----------------
+
+
+== THE FOLLOWING MAY BE OUTDATED ==
 
 This is how you run Wesnoth with sel_universal (SDL-based PPAPI implementation). Does not work at the moment.
 
@@ -76,7 +38,4 @@ This is how you run Wesnoth with sel_universal (SDL-based PPAPI implementation).
 
 # Run wesnoth
 scons-out/dbg-linux-x86-64/staging/sel_universal -a -c  -- wesnoth-debug-stubout -d < src/trusted/sniversal/launch.stdin
-
-
----------------
 
