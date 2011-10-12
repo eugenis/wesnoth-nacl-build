@@ -7,12 +7,14 @@
     <body>
     <h1>Wesnoth NativeClient demo</h1>
 
-    <embed name="nacl_module"
-           id="wesnoth"
-           width=1024 height=800
-           src="wesnoth.nmf"
-           type="application/x-nacl" />
+    <div id="nacl_div">
+    </div>
+    <canvas id="progress_bar"
+    width="1024" height="20">
+    Your browser does not support HTML5 Canvas.
+   </canvas>
 
-    <br />
+    <script src="wesnoth.js"></script>
+
   </body>
 </HTML>

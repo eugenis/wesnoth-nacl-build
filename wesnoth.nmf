@@ -4,43 +4,43 @@
     "x86-64": {"url": "lib64/runnable-ld.so"}
   },
   "files": {
-    "lib/libc.so.ca3390c7" : {
-      "x86-32" : {"url": "lib32/libc.so.ca3390c7"},
-      "x86-64" : {"url": "lib64/libc.so.ca3390c7"}
+    "libc.so.e0920b21" : {
+      "x86-32" : {"url": "lib32/libc.so.e0920b21"},
+      "x86-64" : {"url": "lib64/libc.so.e0920b21"}
     },
-    "lib/libdl.so.ca3390c7" : {
-      "x86-32" : {"url": "lib32/libdl.so.ca3390c7"},
-      "x86-64" : {"url": "lib64/libdl.so.ca3390c7"}
+    "libdl.so.e0920b21" : {
+      "x86-32" : {"url": "lib32/libdl.so.e0920b21"},
+      "x86-64" : {"url": "lib64/libdl.so.e0920b21"}
     },
-    "lib/librt.so.ca3390c7" : {
-      "x86-32" : {"url": "lib32/librt.so.ca3390c7"},
-      "x86-64" : {"url": "lib64/librt.so.ca3390c7"}
+    "librt.so.e0920b21" : {
+      "x86-32" : {"url": "lib32/librt.so.e0920b21"},
+      "x86-64" : {"url": "lib64/librt.so.e0920b21"}
     },
-    "lib/libm.so.ca3390c7" : {
-      "x86-32" : { "url": "lib32/libm.so.ca3390c7"},
-      "x86-64" : { "url": "lib64/libm.so.ca3390c7"}
+    "libm.so.e0920b21" : {
+      "x86-32" : { "url": "lib32/libm.so.e0920b21"},
+      "x86-64" : { "url": "lib64/libm.so.e0920b21"}
     },
-    "lib/libgcc_s.so.1" : {
+    "libgcc_s.so.1" : {
       "x86-32" : { "url": "lib32/libgcc_s.so.1"},
       "x86-64" : { "url": "lib64/libgcc_s.so.1"}
     },
-    "lib/libpthread.so.ca3390c7" : {
-      "x86-32" : { "url": "lib32/libpthread.so.ca3390c7"},
-      "x86-64" : { "url": "lib64/libpthread.so.ca3390c7"}
+    "libpthread.so.e0920b21" : {
+      "x86-32" : { "url": "lib32/libpthread.so.e0920b21"},
+      "x86-64" : { "url": "lib64/libpthread.so.e0920b21"}
     },
-    "lib/libstdc++.so.6" : {
+    "libstdc++.so.6" : {
       "x86-32" : { "url": "lib32/libstdc++.so.6"},
       "x86-64" : { "url": "lib64/libstdc++.so.6"}
     },
-    "lib/libplatform.so" : {
+    "libplatform.so" : {
       "x86-32" : { "url": "lib32/libplatform.so"},
       "x86-64" : { "url": "lib64/libplatform.so"}
     },
-    "lib/libgio.so" : {
+    "libgio.so" : {
       "x86-32" : { "url": "lib32/libgio.so"},
       "x86-64" : { "url": "lib64/libgio.so"}
     },
-    "lib/libppapi_cpp.so" : {
+    "libppapi_cpp.so" : {
       "x86-32" : { "url": "lib32/libppapi_cpp.so"},
       "x86-64" : { "url": "lib64/libppapi_cpp.so"}
     },

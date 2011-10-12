@@ -7,11 +7,14 @@ At the moment ffmpeg fails compilation with glibc. Just delete if from the Makef
 Get wesnoth-1.9.5 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
 
 There is an "install" commented out in the build.sh file because it is too slow to do on every incremental build.
-Uncomment it and run ./build.sh once.
+Uncomment it and run ./build.sh once, then comment it out again.
 
-Then do some file indexing magic that's too complex to describe here ;)
-Patch adds two scripts that do a part of it.
+Delete wqy-zenhei.ttc from the installation if you can live without it. It's >13M!
 
+Then do some file indexing magic:
+./buildpack.py $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/share/wesnoth/ ppapi/packs_generated.cc
+./genfs.sh
+rm wesnoth ppapi/libwesnoth_ppapi.a ; ./build.sh && cp wesnoth $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/bin/wesnoth
 
 # Go to the toolchain dir and run the web server
 python -m SimpleHTTPServer 8000
