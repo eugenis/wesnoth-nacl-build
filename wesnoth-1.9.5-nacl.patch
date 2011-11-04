@@ -84,10 +84,10 @@ index 0000000..c51819c
 +  build=release wesnoth # install
 diff --git a/buildpack.py b/buildpack.py
 new file mode 100755
-index 0000000..b2bbc67
+index 0000000..da1e37f
 --- /dev/null
 +++ b/buildpack.py
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,139 @@
 +#!/usr/bin/python
 +
 +import shutil
@@ -121,19 +121,42 @@ index 0000000..b2bbc67
 +    ['data/ai', '*', ''],
 +    ['data/campaigns', '_main.cfg', ''],
 +    ['sounds/button.wav', '*', ''],
++    ['sounds/select.wav', '*', ''],
 +    ]
 +
++# These files are needed to display the campaign list.
 +pack2_masks = [
++    ['data/core/images/misc', '*', ''],
++    ['data/campaigns', 'campaign_image.png', ''],
++    ['data/campaigns', 'campaign_image.jpg', ''],
++    ['data/core/images/units/human-loyalists/knight.png', '*', ''],
++    ['data/core/images/units/elves-wood/lord.png', '*', ''],
++    ['data/core/images/units/human-outlaws/fugitive.png', '*', ''],
++    ['data/core/images/units/elves-wood/high-lord.png', '*', ''],
++    ['data/core/images/units/human-loyalists/general.png', '*', ''],
++    ['data/core/images/units/human-magi/elder-mage.png', '*', ''],
++    ['data/core/images/units/undead/soulless-swimmer.png', '*', ''],
++    ['data/core/images/units/orcs/ruler.png', '*', ''],
++    ['data/campaigns/Heir_To_The_Throne/images/units/konrad-lord-leading.png', '*', ''],
++    ['data/campaigns/The_South_Guard/images/deoran/horseman-commander-defend.png', '*', ''],
++    ['data/campaigns/Descent_Into_Darkness/images/units/dark-mage.png', '*', ''],
++    ['data/campaigns/The_Rise_Of_Wesnoth/images/units/noble-lord.png', '*', ''],
++    ['data/campaigns/Under_the_Burning_Suns/images/units/elves-desert/kaleh.png', '*', ''],
++    ['data/core/images/items/hammer-runic.png', '*', ''],
++    ['data/core/images/items/sceptre-of-fire.png', '*', ''],
++    ['data/core/images/scenery/dwarven-doors-closed.png', '*', ''],
++    ]
++
++pack3_masks = [
 +    ['data', '*.cfg', ''],
 +    ['data/core/images/terrain', '*', ''],
 +    ['data/core/images/themes', '*', ''],
-+    ['data/core/images/misc', '*', ''],
 +    ['data/core/sounds', '*', ''],
 +    ['data/lua', '*', ''],
 +    ['sounds', '*', ''],
 +    ]
 +
-+packs = [pack0_masks, pack1_masks, pack2_masks]
++packs = [pack0_masks, pack1_masks, pack2_masks, pack3_masks]
 +
 +
 +all_files = set()
@@ -193,7 +216,7 @@ index 0000000..b2bbc67
 +
 +packs.append([['data/core/images/portraits', '*', '']])
 +packs.append([['data/core/images', '*', '']])
-+# packs.append([['data', '*', 'data/core/music/*']])
++packs.append([['data', '*', 'data/core/music/*']])
 +
 +
 +# build packs
@@ -204,6 +227,190 @@ index 0000000..b2bbc67
 +    fout_list.write(out_list_data)
 +fout_list.write('{"", "", 0}\n')
 +fout_list.close()
+diff --git a/check_browser.js b/check_browser.js
+new file mode 100644
+index 0000000..9636ad0
+--- /dev/null
++++ b/check_browser.js
+@@ -0,0 +1,178 @@
++/*
++ * Copyright (c) 2011 The Native Client Authors. All rights reserved.
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file.
++ */
++
++/**
++ * @fileoverview This file provides a BrowserChecker Javascript class.
++ * Users can create a BrowserChecker object, invoke checkBrowser(|version|),
++ * and then use getIsValidBrowser() and getBrowserSupportStatus()
++ * to determine if the browser version is greater than |version|
++ * and if the Native Client plugin is found.
++ */
++
++// Create a namespace object
++var browser_version = browser_version || {};
++
++/**
++ * Class to provide checking for version and NativeClient.
++ * @param {integer} arg1 An argument that indicates major version of Chrome we
++ *     require, such as 14.
++ */
++
++/**
++ * Constructor for the BrowserChecker.  Sets the major version of
++ * Chrome that is required to |minChromeVersion|.
++ * @param minChromeVersion   The earliest major version of chrome that
++ *     is supported.  If the Chrome browser version is less than
++ *     |minChromeVersion| then |isValidBrowswer| will be set to false.
++ * @param opt_maxChromeVersion   Ignored.  Retained for backwards compatibility.
++ * @param appVersion  The application version string.
++ * @param plugins     The plugins that exist in the browser.
++ * @constructor
++ */
++browser_version.BrowserChecker = function(minChromeVersion,
++                                          appVersion, plugins,
++                                          opt_maxChromeVersion) {
++  /**
++   * Version specified by the user. This class looks to see if the browser
++   * version is >= |minChromeVersion_|.
++   * @type {integer}
++   * @private
++   */
++  this.minChromeVersion_ = minChromeVersion;
++
++  /**
++   * List of Browser plugin objects.
++   * @type {Ojbect array}
++   * @private
++   */
++  this.plugins_ = plugins;
++
++  /**
++   * Application version string from the Browser.
++   * @type {integer}
++   * @private
++   */
++  this.appVersion_ = appVersion;
++
++  /**
++   * Flag used to indicate if the browser has Native Client and is if the
++   * browser version is recent enough.
++   * @type {boolean}
++   * @private
++   */
++  this.isValidBrowser_ = false;
++
++  /**
++   * Actual major version of Chrome -- found by querying the browser.
++   * @type {integer}
++   * @private
++   */
++  this.chromeVersion_ = null;
++
++  /**
++   * Browser support status. This allows the user to get a detailed status
++   * rather than using this.browserSupportMessage.
++   */
++  this.browserSupportStatus_ =
++      browser_version.BrowserChecker.StatusValues.UNKNOWN;
++}
++
++/**
++ * The values used for BrowserChecker status to indicate success or
++ * a specific error.
++ * @enum {id}
++ */
++browser_version.BrowserChecker.StatusValues = {
++  UNKNOWN: 0,
++  NACL_ENABLED: 1,
++  UNKNOWN_BROWSER: 2,
++  CHROME_VERSION_TOO_OLD: 3,
++  NACL_NOT_ENABLED: 4,
++  NOT_USING_SERVER: 5
++};
++
++/**
++ * Determines if the plugin with name |name| exists in the browser.
++ * @param {string} name The name of the plugin.
++ * @param {Object array} plugins The plugins in this browser.
++ * @return {bool} |true| if the plugin is found.
++ */
++browser_version.BrowserChecker.prototype.pluginExists = function(name,
++                                                                 plugins) {
++  for (var index=0; index < plugins.length; index++) {
++    var plugin = this.plugins_[index];
++    var plugin_name = plugin['name'];
++    // If the plugin is not found, you can use the Javascript console
++    // to see the names of the plugins that were found when debugging.
++    if (plugin_name.indexOf(name) != -1) {
++      return true;
++    }
++  }
++  return false;
++}
++
++/**
++ * Returns browserSupportStatus_ which indicates if the browser supports
++ * Native Client.  Values are defined as literals in
++ * browser_version.BrowserChecker.StatusValues.
++ * @ return {int} Level of NaCl support.
++ */
++browser_version.BrowserChecker.prototype.getBrowserSupportStatus = function() {
++  return this.browserSupportStatus_;
++}
++
++/**
++ * Returns isValidBrowser (true/false) to indicate if the browser supports
++ * Native Client.
++ * @ return {bool} If this browser has NativeClient and correct version.
++ */
++browser_version.BrowserChecker.prototype.getIsValidBrowser = function() {
++  return this.isValidBrowser_;
++}
++
++/**
++ * Checks to see if this browser can support Native Client applications.
++ * For Chrome browsers, checks to see if the "Native Client" plugin is
++ * enabled.
++ */
++browser_version.BrowserChecker.prototype.checkBrowser = function() {
++  var versionPatt = /Chrome\/(\d+)\.(\d+)\.(\d+)\.(\d+)/;
++  var result = this.appVersion_.match(versionPatt);
++
++  // |result| stores the Chrome version number.
++  if (!result) {
++    this.isValidBrowser_ = false;
++    this.browserSupportStatus_ =
++        browser_version.BrowserChecker.StatusValues.UNKNOWN_BROWSER;
++  } else {
++    this.chromeVersion_ = result[1];
++    // We know we have Chrome, check version and/or plugin named Native Client
++    if (this.chromeVersion_ >= this.minChromeVersion_) {
++      var found_nacl = this.pluginExists('Native Client', this.plugins_);
++      if (found_nacl) {
++        this.isValidBrowser_ = true;
++        this.browserSupportStatus_ =
++            browser_version.BrowserChecker.StatusValues.NACL_ENABLED;
++      } else {
++        this.isValidBrowser_ = false;
++        this.browserSupportStatus_ =
++            browser_version.BrowserChecker.StatusValues.NACL_NOT_ENABLED;
++      }
++    } else {
++      // We are in a version that is less than |minChromeVersion_|
++      this.isValidBrowser_ = false;
++      this.browserSupportStatus_ =
++          browser_version.BrowserChecker.StatusValues.CHROME_VERSION_TOO_OLD;
++    }
++  }
++  var my_protocol = window.location.protocol;
++  if (my_protocol.indexOf('file') == 0) {
++    this.isValidBrowser_ = false;
++    this.browserSupportStatus_ =
++        browser_version.BrowserChecker.StatusValues.NOT_USING_SERVER;
++  }
++}
++
 diff --git a/genfs.sh b/genfs.sh
 new file mode 100755
 index 0000000..60639f3
@@ -253,10 +460,10 @@ index 0000000..68aacff
 +Export("libwesnoth_ppapi")
 diff --git a/ppapi/plugin.cc b/ppapi/plugin.cc
 new file mode 100644
-index 0000000..f0199a3
+index 0000000..231ad8a
 --- /dev/null
 +++ b/ppapi/plugin.cc
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,197 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -358,6 +565,9 @@ index 0000000..f0199a3
 +    proxy->mkdir("/usr", 0777);
 +    proxy->mkdir("/usr/local", 0777);
 +    proxy->mkdir("/usr/local/share", 0777);
++    // The following 2 lines can be removed when nacl-mounts starts intercepting mkdir() calls.
++    proxy->mkdir("/.wesnoth1.9", 0777);
++    proxy->mkdir("/.wesnoth1.9/saves", 0777);
 +    int res = proxy->mount("/usr/local/share/wesnoth", http2_mount);
 +    if (!res) {
 +      fprintf(stderr, "FS initialization success.\n");
@@ -507,3 +717,182 @@ index 580e545..985a976 100644
  	return 0;
  } // end main
 -
+diff --git a/src/gui/widgets/text.cpp b/src/gui/widgets/text.cpp
+index 21bae78..cee3814 100644
+--- a/src/gui/widgets/text.cpp
++++ b/src/gui/widgets/text.cpp
+@@ -283,6 +283,8 @@ void ttext_::signal_handler_sdl_key_down(const event::tevent event
+ 		, const Uint16 unicode)
+ {
+ 
++	fprintf(stderr, "sdl_key_down: %d %d %d\n", key, modifier, unicode);
++
+ 	DBG_GUI_E << LOG_HEADER << ' ' << event << ".\n";
+ 
+ // For copy/paste we use a different key on the MAC. Other ctrl modifiers won't
+diff --git a/wesnoth.html b/wesnoth.html
+new file mode 100644
+index 0000000..a3f5f8f
+--- /dev/null
++++ b/wesnoth.html
+@@ -0,0 +1,24 @@
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
++          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
++<html>
++  <head>
++    <title>Wesnoth NativeClient demo</title>
++    <script type="text/javascript" src="check_browser.js"></script>
++  </head>
++    <body>
++    <h1>Wesnoth NativeClient demo</h1>
++
++    <div id="nacl_div">
++    </div>
++    <canvas id="progress_bar"
++    width="1024" height="20">
++    Your browser does not support HTML5 Canvas.
++   </canvas>
++
++    <script src="wesnoth.js"></script>
++
++    <br />
++    Beware: saves are in-memory and are lost when the page is reloaded.
++
++  </body>
++</HTML>
+diff --git a/wesnoth.js b/wesnoth.js
+new file mode 100644
+index 0000000..4157154
+--- /dev/null
++++ b/wesnoth.js
+@@ -0,0 +1,130 @@
++function updateProgressBar(percent, message, styleBackground,
++                           styleForeground, styleText) {
++    console.log("message: " + message);
++    console.log("progress: " + percent + "%");
++    var progress_bar =
++        document.getElementById('progress_bar');
++    var ctx = progress_bar.getContext('2d');
++    var width = progress_bar.width;
++    ctx.fillStyle = styleForeground ? styleForeground :
++        "rgb(200, 200, 200)";
++    ctx.fillRect(0, 0, percent * width, 20);
++    ctx.fillStyle = styleBackground ? styleBackground :
++        "#A9A9A9";  // From the css
++    ctx.fillRect(percent * width, 0, width, 20);
++    ctx.fillStyle = styleText ? styleText : "black";
++    ctx.textAlign = "center";
++    ctx.textBaseline = "middle";
++    ctx.font = 'sans-serif';
++    ctx.fillText(message, width / 2, 10, 3 * width / 4);
++}
++
++function HandleProgress(event) {
++    var loadPercent = 0.0;
++    var loadPercentString;
++    if (event.lengthComputable && event.total > 0) {
++        loadPercent = event.loaded / event.total;
++    } else {
++        // The total length is not yet known.
++        loadPercent = -1.0;
++    }
++    updateProgressBar(loadPercent, "Initializing Wesnoth (please be patient) ...");
++}
++
++function HandleMessage(event) {
++    console.log(event.data);
++    var data = JSON.parse(event.data);
++    updateProgressBar(data[1] / data[2], data[0]);
++}
++
++function updateStatusFail(message) {
++    updateProgressBar(1, message, 'black',
++                      'red', 'black')
++}
++
++function moduleLoadError() {
++    var msg = "NaCl module load error: " + document.getElementById('wesnoth').lastError;
++    updateStatusFail(msg);
++    console.log(msg);
++}
++
++function moduleLoadAbort() {
++    var msg = "NaCl module load aborted: " + document.getElementById('wesnoth').lastError;
++    updateStatusFail(msg);
++    console.log(msg);
++}
++
++function requestQuotaAndStartWesnoth() {
++    quota_required = 380*1024*1024;
++    window.webkitStorageInfo.requestQuota(PERSISTENT, quota_required, function(bytes) {
++            console.log("Persistent storage quota granted: " + bytes + " bytes");
++            if (bytes >= quota_required) {
++                var embed = document.createElement('embed');
++                embed.setAttribute('name', 'nacl_module');
++                embed.setAttribute('id', 'wesnoth');
++                embed.setAttribute('width', 1024);
++                embed.setAttribute('height', 800);
++                embed.setAttribute('src', 'wesnoth.nmf');
++                embed.setAttribute('type', 'application/x-nacl');
++                var div = document.getElementById("nacl_div");
++                div.appendChild(embed);
++                div.addEventListener('progress', HandleProgress, true);
++                div.addEventListener('message', HandleMessage, true);
++                div.addEventListener('error', moduleLoadError, true);
++                div.addEventListener('abort', moduleLoadAbort, true);
++            } else {
++                updateStatusFail("Unsufficient HTML5 file system quota: " + bytes + " bytes");
++                console.log("Unsufficient HTML5 file system quota: " + bytes + " bytes");
++            }
++        }, function(e) {
++            updateStatusFail("HTML5 file system quota request failed");
++            console.log("Quota request error: " + e);
++        });
++}
++
++
++function checkBrowser() {
++    var isValidBrowser = false;
++    var browserSupportStatus = 0;
++    var checker = new browser_version.BrowserChecker(15,  // Minumum Chrome version.
++                                                     navigator["appVersion"],
++                                                     navigator["plugins"]);
++    checker.checkBrowser();
++    isValidBrowser = checker.getIsValidBrowser();
++    browserSupportStatus = checker.getBrowserSupportStatus();
++    
++    switch (browserSupportStatus) {
++    case browser_version.BrowserChecker.StatusValues.NACL_ENABLED:
++        console.log('Native Client plugin enabled.');
++        break;
++    case browser_version.BrowserChecker.StatusValues.UNKNOWN_BROWSER:
++        updateStatusFail('UNKNOWN BROWSER');
++        break;
++    case browser_version.BrowserChecker.StatusValues.CHROME_VERSION_TOO_OLD:
++        console.log('Chrome too old: You must use Chrome version 15 or later.');
++        updateStatusFail('NEED CHROME 15 OR LATER');
++        break;
++    case browser_version.BrowserChecker.StatusValues.NACL_NOT_ENABLED:
++        console.log(
++                    'NaCl disabled: Native Client is not enabled.<br>' +
++                    'Please go to <b>chrome://plugins</b> and enable Native Client ' +
++                    'plugin.');
++        updateStatusFail('NativeClient NOT ENABLED');
++        break;
++    case browser_version.BrowserChecker.StatusValues.NOT_USING_SERVER:
++        console.log(
++                    'file: URL detected, please use a web server to host Native ' +
++                    'Client applications.');
++        updateStatusFail('file:// URLs NOT ALLOWED');
++    default:
++        console.log('Unknown error: Unable to detect browser and/or ' +
++                    'Native Client support.');
++        updateStatusFail('UNKNOWN ERROR');
++        break;
++    }
++    return isValidBrowser && browserSupportStatus == browser_version.BrowserChecker.StatusValues.NACL_ENABLED;
++}
++
++if (checkBrowser())
++    requestQuotaAndStartWesnoth();
++
