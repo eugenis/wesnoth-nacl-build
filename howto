@@ -4,14 +4,16 @@ Build and install all naclports.
 make NACL_GLIBC=1 NACL_PACKAGES_BITSIZE=64 make
 At the moment ffmpeg fails compilation with glibc. Just delete if from the Makefile if that's the case.
 
-Get wesnoth-1.9.5 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
+Get wesnoth-1.9.9 from official site, apply the patch (wesnoth-1.9.5-nacl.patch), run build.sh.
+Mirror: http://commondatastorage.googleapis.com/nativeclient-mirror/nacl/wesnoth-1.9.9.tar.bz2
 
 There is an "install" commented out in the build.sh file because it is too slow to do on every incremental build.
 Uncomment it and run ./build.sh once, then comment it out again.
 
 Delete wqy-zenhei.ttc from the installation if you can live without it. It's >13M!
 
-Then do some file indexing magic:
+Then do some file indexing magic (you don't need this if the patch already contains the 3 ppapi/*_generated.cc files, and you did not change any game data):
+./genfs.sh
 ./buildpack.py $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/share/wesnoth/ ppapi/packs_generated.cc
 ./genfs.sh
 rm wesnoth ppapi/libwesnoth_ppapi.a ; ./build.sh && cp wesnoth $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/bin/wesnoth
@@ -19,7 +21,7 @@ rm wesnoth ppapi/libwesnoth_ppapi.a ; ./build.sh && cp wesnoth $NACL_TOOLCHAIN_R
 # Go to the toolchain dir and run the web server
 python -m SimpleHTTPServer 8000
 
-Run chrome and navigate to wesnoth.html.
+Run chrome (at least M15) and navigate to wesnoth.html.
 
 
 ----------------
