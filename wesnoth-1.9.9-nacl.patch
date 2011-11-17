@@ -441,19 +441,23 @@ index f5cecd1..654fbc9 100644
  std::string get_addon_campaigns_dir()
  {
 diff --git a/src/game.cpp b/src/game.cpp
-index ac51bc1..c01cf09 100644
+index ac51bc1..8f8e81e 100644
 --- a/src/game.cpp
 +++ b/src/game.cpp
-@@ -578,7 +578,7 @@ void init_custom_malloc();
+@@ -578,7 +578,12 @@ void init_custom_malloc();
  }
  #endif
  
--int main(int argc, char** argv)
++
++#ifdef __native_client__
 +int wesnoth_main(int argc, char** argv)
++#else
+ int main(int argc, char** argv)
++#endif
  {
  #if defined(_OPENMP) && !defined(_WIN32) && !defined(__APPLE__)
  	// Wesnoth is a special case for OMP
-@@ -657,4 +657,3 @@ int main(int argc, char** argv)
+@@ -657,4 +662,3 @@ int main(int argc, char** argv)
  
  	return 0;
  } // end main
