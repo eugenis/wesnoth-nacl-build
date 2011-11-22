@@ -90,10 +90,10 @@ new file mode 100644
 index 0000000..e69de29
 diff --git a/nacl/plugin.cc b/nacl/plugin.cc
 new file mode 100644
-index 0000000..44db273
+index 0000000..5844d23
 --- /dev/null
 +++ b/nacl/plugin.cc
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,264 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -146,7 +146,7 @@ index 0000000..44db273
 +                                                  width_(0),
 +                                                  height_(0),
 +                                                  progress_handler_(this),
-+						  directory_reader_(this) {
++                                                  directory_reader_(this) {
 +    RequestInputEvents(PP_INPUTEVENT_CLASS_MOUSE);
 +    RequestFilteringInputEvents(PP_INPUTEVENT_CLASS_KEYBOARD);
 +
@@ -156,7 +156,6 @@ index 0000000..44db273
 +    fprintf(stderr, "Requesting an HTML5 local persistent filesystem.\n");
 +    fflush(stderr);
 +    fs_ = new pp::FileSystem(this, PP_FILESYSTEMTYPE_LOCALPERSISTENT);
-+      
 +  }
 +
 +  ~PluginInstance() {
@@ -464,11 +463,15 @@ index ac51bc1..8f8e81e 100644
 -
 diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
 new file mode 100755
-index 0000000..9ae0346
+index 0000000..56fe8f2
 --- /dev/null
 +++ b/utils/nacl/build.sh
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,15 @@
 +#!/bin/bash
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
 +set -e -x
 +
 +ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
@@ -481,11 +484,15 @@ index 0000000..9ae0346
 +  build=release wesnoth install
 diff --git a/utils/nacl/build32.sh b/utils/nacl/build32.sh
 new file mode 100755
-index 0000000..7ecf657
+index 0000000..842d263
 --- /dev/null
 +++ b/utils/nacl/build32.sh
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,15 @@
 +#!/bin/bash
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
 +set -e -x
 +
 +ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
@@ -498,11 +505,14 @@ index 0000000..7ecf657
 +  build=release wesnoth
 diff --git a/utils/nacl/buildpack.py b/utils/nacl/buildpack.py
 new file mode 100755
-index 0000000..092cec7
+index 0000000..42c22f9
 --- /dev/null
 +++ b/utils/nacl/buildpack.py
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,145 @@
 +#!/usr/bin/python
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
 +
 +import shutil
 +import glob
@@ -646,11 +656,15 @@ index 0000000..092cec7
 +fout_list.close()
 diff --git a/utils/nacl/genfs.sh b/utils/nacl/genfs.sh
 new file mode 100755
-index 0000000..46b8837
+index 0000000..4965eab
 --- /dev/null
 +++ b/utils/nacl/genfs.sh
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,13 @@
 +#!/bin/bash
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
 +BASE=$NACL_SDK_ROOT/toolchain/linux_x86/x86_64-nacl
 +DIRS_OUT=nacl/generated/dir_list.h
 +FILES_OUT=nacl/generated/file_list.h
@@ -708,11 +722,14 @@ index 0000000..d93d90d
 +headers appropriately.
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
 new file mode 100755
-index 0000000..65e1749
+index 0000000..dc83d03
 --- /dev/null
 +++ b/utils/nacl/install.sh
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,48 @@
 +#!/bin/bash
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
 +
 +set -e
 +
@@ -943,10 +960,16 @@ index 0000000..9636ad0
 +
 diff --git a/utils/nacl/static/peppermount_helper.js b/utils/nacl/static/peppermount_helper.js
 new file mode 100644
-index 0000000..a831ddd
+index 0000000..cf11da3
 --- /dev/null
 +++ b/utils/nacl/static/peppermount_helper.js
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,75 @@
++/*
++ * Copyright (c) 2011 The Native Client Authors. All rights reserved.
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file.
++ */
++
 +function toArray(list) {
 +  return Array.prototype.slice.call(list || [], 0);
 +}
@@ -982,8 +1005,8 @@ index 0000000..a831ddd
 +function listResults(entries) {
 +    s = ''
 +    entries.forEach(function(entry, i) {
-+	s += entry.name;
-+	s += '\n';
++      s += entry.name;
++      s += '\n';
 +    });
 +    console.log('entries: ' + s);
 +    document.getElementById('wesnoth').postMessage(s);
@@ -1018,13 +1041,18 @@ index 0000000..a831ddd
 +}
 diff --git a/utils/nacl/static/wesnoth.html b/utils/nacl/static/wesnoth.html
 new file mode 100644
-index 0000000..ae7d28d
+index 0000000..900e780
 --- /dev/null
 +++ b/utils/nacl/static/wesnoth.html
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,28 @@
 +<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 +          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 +<html>
++  <!--
++  Copyright (c) 2011 The Native Client Authors. All rights reserved.
++  Use of this source code is governed by a BSD-style license that can be
++  found in the LICENSE file.
++  -->
 +  <head>
 +    <title>Wesnoth NativeClient demo</title>
 +    <script type="text/javascript" src="check_browser.js"></script>
@@ -1047,10 +1075,16 @@ index 0000000..ae7d28d
 +</HTML>
 diff --git a/utils/nacl/static/wesnoth.js b/utils/nacl/static/wesnoth.js
 new file mode 100644
-index 0000000..cda9442
+index 0000000..6b187d7
 --- /dev/null
 +++ b/utils/nacl/static/wesnoth.js
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,143 @@
++/*
++ * Copyright (c) 2011 The Native Client Authors. All rights reserved.
++ * Use of this source code is governed by a BSD-style license that can be
++ * found in the LICENSE file.
++ */
++
 +function updateProgressBar(percent, message, styleBackground,
 +                           styleForeground, styleText) {
 +    console.log("message: " + message);
