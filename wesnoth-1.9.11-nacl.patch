@@ -1,5 +1,5 @@
 diff --git a/SConstruct b/SConstruct
-index 903227e..c487dbd 100755
+index 903227e..d71f906 100755
 --- a/SConstruct
 +++ b/SConstruct
 @@ -291,6 +291,27 @@ if env["prereqs"]:
@@ -51,48 +51,151 @@ index 903227e..c487dbd 100755
  
      env.Append(CPPDEFINES = ["HAVE_CONFIG_H"])
  
-@@ -439,6 +465,8 @@ else:
+diff --git a/scons/config_check_utils.py b/scons/config_check_utils.py
+index b566791..5484ad5 100644
+--- a/scons/config_check_utils.py
++++ b/scons/config_check_utils.py
+@@ -14,5 +14,5 @@ def restore_env(env, backup):
  
- Export(Split("env client_env test_env have_client_prereqs have_server_prereqs have_test_prereqs"))
- SConscript(dirs = Split("po doc packaging/windows"))
-+if env['host'] in ['x86_64-nacl', 'i686-nacl']:
-+    SConscript(dirs = ["nacl"])
+ def find_include(prefixes, include_file, include_subdir, default_prefixes = True):
+     if default_prefixes:
+-        prefixes = ["/usr", "/usr/local", "/sw", "/sw/local"] + prefixes
++        prefixes = prefixes + ["/usr", "/usr/local", "/sw", "/sw/local"]
+     return [(prefix, include) for prefix in prefixes for include in glob(join(prefix, "include", include_subdir, include_file))]
+diff --git a/src/SConscript b/src/SConscript
+index 6c332e8..c6772e1 100644
+--- a/src/SConscript
++++ b/src/SConscript
+@@ -481,7 +481,11 @@ for env in [test_env, client_env, env]:
  
- binaries = Split("wesnoth wesnothd cutter exploder campaignd test")
- builds = {
-diff --git a/nacl/SConscript b/nacl/SConscript
+ game_cpp = client_env.Object("game.cpp", EXTRA_DEFINE = not env["pool_alloc"] and "DISABLE_POOL_ALLOC" or None);
+ 
+-client_env.WesnothProgram("wesnoth", [game_cpp] + [libwesnoth_extras, libwesnoth_core, libwesnoth_sdl, libwesnoth, env["wesnoth_res"]], have_client_prereqs)
++wesnoth_objects = [game_cpp, libwesnoth_extras, libwesnoth_core, libwesnoth_sdl,
++                   libwesnoth, env["wesnoth_res"]]
++if env["host"] in ["x86_64-nacl", "i686-nacl"]:
++    wesnoth_objects += [SConscript("nacl/SConscript")]
++client_env.WesnothProgram("wesnoth", wesnoth_objects, have_client_prereqs)
+ 
+ campaignd_sources = Split("""
+     server/input_stream.cpp
+diff --git a/src/asserts.hpp b/src/asserts.hpp
+index 6a499a4..31b2ede 100644
+--- a/src/asserts.hpp
++++ b/src/asserts.hpp
+@@ -25,7 +25,8 @@
+ #define BREAKPOINT() __debugbreak()
+ #define WES_HALT() do { BREAKPOINT(); exit(1); } while (false)
+ 
+-#elif defined(__GNUG__) && (defined(__i386__) || defined(__x86_64__))
++#elif defined(__GNUG__) && (defined(__i386__) || defined(__x86_64__)) \
++  && !defined(__native_client__)
+ #define BREAKPOINT() asm("int3")
+ #define WES_HALT() do { BREAKPOINT(); abort(); } while (false)
+ 
+diff --git a/src/filesystem.cpp b/src/filesystem.cpp
+index 71feae2..8d431b3 100644
+--- a/src/filesystem.cpp
++++ b/src/filesystem.cpp
+@@ -261,6 +261,26 @@ void get_files_in_dir(const std::string &directory,
+ 	}
+ }
+ 
++#ifdef __native_client__
++// For performance reasons, on NaCl we only keep preferences and saves in persistent storage.
++std::string get_prefs_file()
++{
++	return "/wesnoth-userdata/preferences";
++}
++
++std::string get_save_index_file()
++{
++	return "/wesnoth-userdata/save_index.gz";
++}
++
++std::string get_saves_dir()
++{
++	const std::string dir_path = "/wesnoth-userdata/saves";
++	return get_dir(dir_path);
++}
++
++#else
++
+ std::string get_prefs_file()
+ {
+ 	return get_user_config_dir() + "/preferences";
+@@ -276,6 +296,7 @@ std::string get_saves_dir()
+ 	const std::string dir_path = get_user_data_dir() + "/saves";
+ 	return get_dir(dir_path);
+ }
++#endif
+ 
+ std::string get_addon_campaigns_dir()
+ {
+diff --git a/src/game.cpp b/src/game.cpp
+index 15a3280..8c01b32 100644
+--- a/src/game.cpp
++++ b/src/game.cpp
+@@ -588,7 +588,12 @@ void init_custom_malloc();
+ }
+ #endif
+ 
++
++#ifdef __native_client__
++int wesnoth_main(int argc, char** argv)
++#else
+ int main(int argc, char** argv)
++#endif
+ {
+ 
+ #ifdef HAVE_VISUAL_LEAK_DETECTOR
+@@ -672,4 +677,3 @@ int main(int argc, char** argv)
+ 
+ 	return 0;
+ } // end main
+-
+diff --git a/src/nacl/SConscript b/src/nacl/SConscript
 new file mode 100644
-index 0000000..aca9db9
+index 0000000..c3e7f85
 --- /dev/null
-+++ b/nacl/SConscript
-@@ -0,0 +1,13 @@
-+import commands, os
-+from subprocess import Popen, PIPE
-+from glob import glob
++++ b/src/nacl/SConscript
+@@ -0,0 +1,7 @@
++Import("env")
 +
-+Import("*")
-+
-+for env in [test_env, client_env, env]:
-+    env.Append(CPPDEFINES = "$EXTRA_DEFINE",
-+               CPPPATH=["#/nacl/generated", "#/nacl"])
++env.Append(CPPPATH=["#/src/nacl/generated", "#/src/nacl"])
 +
 +libwesnoth_nacl = env.Library("wesnoth_nacl", ["plugin.cc"])
 +
-+Export("libwesnoth_nacl")
-diff --git a/nacl/dir_list.h b/nacl/dir_list.h
++Return("libwesnoth_nacl")
+diff --git a/src/nacl/dir_list.h b/src/nacl/dir_list.h
 new file mode 100644
-index 0000000..e69de29
-diff --git a/nacl/file_list.h b/nacl/file_list.h
+index 0000000..fe282fb
+--- /dev/null
++++ b/src/nacl/dir_list.h
+@@ -0,0 +1,2 @@
++/* Intentionally empty */
++
+diff --git a/src/nacl/file_list.h b/src/nacl/file_list.h
 new file mode 100644
-index 0000000..e69de29
-diff --git a/nacl/pack_list.h b/nacl/pack_list.h
+index 0000000..fe282fb
+--- /dev/null
++++ b/src/nacl/file_list.h
+@@ -0,0 +1,2 @@
++/* Intentionally empty */
++
+diff --git a/src/nacl/pack_list.h b/src/nacl/pack_list.h
 new file mode 100644
-index 0000000..e69de29
-diff --git a/nacl/plugin.cc b/nacl/plugin.cc
+index 0000000..fe282fb
+--- /dev/null
++++ b/src/nacl/pack_list.h
+@@ -0,0 +1,2 @@
++/* Intentionally empty */
++
+diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
 new file mode 100644
 index 0000000..5844d23
 --- /dev/null
-+++ b/nacl/plugin.cc
++++ b/src/nacl/plugin.cc
 @@ -0,0 +1,264 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
@@ -358,112 +461,9 @@ index 0000000..5844d23
 +    return new PepperModule();
 +  }
 +}  // namespace pp
-diff --git a/scons/config_check_utils.py b/scons/config_check_utils.py
-index b566791..5484ad5 100644
---- a/scons/config_check_utils.py
-+++ b/scons/config_check_utils.py
-@@ -14,5 +14,5 @@ def restore_env(env, backup):
- 
- def find_include(prefixes, include_file, include_subdir, default_prefixes = True):
-     if default_prefixes:
--        prefixes = ["/usr", "/usr/local", "/sw", "/sw/local"] + prefixes
-+        prefixes = prefixes + ["/usr", "/usr/local", "/sw", "/sw/local"]
-     return [(prefix, include) for prefix in prefixes for include in glob(join(prefix, "include", include_subdir, include_file))]
-diff --git a/src/SConscript b/src/SConscript
-index dfb8f9e..45f687a 100644
---- a/src/SConscript
-+++ b/src/SConscript
-@@ -478,7 +478,11 @@ for env in [test_env, client_env, env]:
- 
- game_cpp = client_env.Object("game.cpp", EXTRA_DEFINE = not env["pool_alloc"] and "DISABLE_POOL_ALLOC" or None);
- 
--client_env.WesnothProgram("wesnoth", [game_cpp] + [libwesnoth_extras, libwesnoth_core, libwesnoth_sdl, libwesnoth, env["wesnoth_res"]], have_client_prereqs)
-+wesnoth_objects = [game_cpp, libwesnoth_extras, libwesnoth_core, libwesnoth_sdl,
-+                   libwesnoth, env["wesnoth_res"]]
-+if env['host'] in ['x86_64-nacl', 'i686-nacl']:
-+    wesnoth_objects += [libwesnoth_nacl]
-+client_env.WesnothProgram("wesnoth", wesnoth_objects, have_client_prereqs)
- 
- campaignd_sources = Split("""
-     server/input_stream.cpp
-diff --git a/src/asserts.hpp b/src/asserts.hpp
-index 6a499a4..31b2ede 100644
---- a/src/asserts.hpp
-+++ b/src/asserts.hpp
-@@ -25,7 +25,8 @@
- #define BREAKPOINT() __debugbreak()
- #define WES_HALT() do { BREAKPOINT(); exit(1); } while (false)
- 
--#elif defined(__GNUG__) && (defined(__i386__) || defined(__x86_64__))
-+#elif defined(__GNUG__) && (defined(__i386__) || defined(__x86_64__)) \
-+  && !defined(__native_client__)
- #define BREAKPOINT() asm("int3")
- #define WES_HALT() do { BREAKPOINT(); abort(); } while (false)
- 
-diff --git a/src/filesystem.cpp b/src/filesystem.cpp
-index f5cecd1..654fbc9 100644
---- a/src/filesystem.cpp
-+++ b/src/filesystem.cpp
-@@ -261,6 +261,26 @@ void get_files_in_dir(const std::string &directory,
- 	}
- }
- 
-+#ifdef __native_client__
-+// For performance reasons, on NaCl we only keep preferences and saves in persistent storage.
-+std::string get_prefs_file()
-+{
-+	return "/wesnoth-userdata/preferences";
-+}
-+
-+std::string get_save_index_file()
-+{
-+	return "/wesnoth-userdata/save_index.gz";
-+}
-+
-+std::string get_saves_dir()
-+{
-+	const std::string dir_path = "/wesnoth-userdata/saves";
-+	return get_dir(dir_path);
-+}
-+
-+#else
-+
- std::string get_prefs_file()
- {
- 	return get_user_config_dir() + "/preferences";
-@@ -276,6 +296,7 @@ std::string get_saves_dir()
- 	const std::string dir_path = get_user_data_dir() + "/saves";
- 	return get_dir(dir_path);
- }
-+#endif
- 
- std::string get_addon_campaigns_dir()
- {
-diff --git a/src/game.cpp b/src/game.cpp
-index ac51bc1..8f8e81e 100644
---- a/src/game.cpp
-+++ b/src/game.cpp
-@@ -578,7 +578,12 @@ void init_custom_malloc();
- }
- #endif
- 
-+
-+#ifdef __native_client__
-+int wesnoth_main(int argc, char** argv)
-+#else
- int main(int argc, char** argv)
-+#endif
- {
- #if defined(_OPENMP) && !defined(_WIN32) && !defined(__APPLE__)
- 	// Wesnoth is a special case for OMP
-@@ -657,4 +662,3 @@ int main(int argc, char** argv)
- 
- 	return 0;
- } // end main
--
 diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
 new file mode 100755
-index 0000000..56fe8f2
+index 0000000..a8784c3
 --- /dev/null
 +++ b/utils/nacl/build.sh
 @@ -0,0 +1,15 @@
@@ -477,7 +477,7 @@ index 0000000..56fe8f2
 +ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
 +PATH=$ROOT/bin:$ROOT/x86_64-nacl/usr/bin:$PATH
 +
-+PKG_CONFIG_PATH=$ROOT/x86_64-nacl/usr/lib/pkgconfig scons -j15 host=x86_64-nacl \
++PKG_CONFIG_PATH=$ROOT/x86_64-nacl/usr/lib/pkgconfig scons -j5 host=x86_64-nacl \
 +  boostdir=$ROOT/x86_64-nacl/usr/include/boost \
 +  boostlibdir=$ROOT/x86_64-nacl/usr/lib sdldir=$ROOT/x86_64-nacl/usr nls=no \
 +  destdir=$ROOT/x86_64-nacl \
@@ -505,7 +505,7 @@ index 0000000..842d263
 +  build=release wesnoth
 diff --git a/utils/nacl/buildpack.py b/utils/nacl/buildpack.py
 new file mode 100755
-index 0000000..42c22f9
+index 0000000..f315a7d
 --- /dev/null
 +++ b/utils/nacl/buildpack.py
 @@ -0,0 +1,145 @@
@@ -629,7 +629,7 @@ index 0000000..42c22f9
 +
 +
 +base_dir = sys.argv[1]
-+out_list = os.path.join(os.getcwd(), 'nacl/generated/pack_list.h')
++out_list = os.path.join(os.getcwd(), 'src/nacl/generated/pack_list.h')
 +os.chdir(base_dir)
 +
 +# define additional packs
@@ -656,7 +656,7 @@ index 0000000..42c22f9
 +fout_list.close()
 diff --git a/utils/nacl/genfs.sh b/utils/nacl/genfs.sh
 new file mode 100755
-index 0000000..4965eab
+index 0000000..3e3b198
 --- /dev/null
 +++ b/utils/nacl/genfs.sh
 @@ -0,0 +1,13 @@
@@ -666,8 +666,8 @@ index 0000000..4965eab
 +# found in the LICENSE file.
 +
 +BASE=$NACL_SDK_ROOT/toolchain/linux_x86/x86_64-nacl
-+DIRS_OUT=nacl/generated/dir_list.h
-+FILES_OUT=nacl/generated/file_list.h
++DIRS_OUT=src/nacl/generated/dir_list.h
++FILES_OUT=src/nacl/generated/file_list.h
 +(cd $BASE/usr/local/share/wesnoth; find -type d) | perl -pe 's/^\.//' | perl -pe 's/^(.*)$/"$1",/' >$DIRS_OUT
 +echo "" >>$DIRS_OUT
 +(cd $BASE/usr/local/share/wesnoth; find -type f -printf "%p %s\n") | perl -pe 's/^\.//' | perl -pe 's/^(.*) (\d+)$/{"$1", $2},/' >$FILES_OUT
