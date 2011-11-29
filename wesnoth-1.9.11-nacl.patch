@@ -193,10 +193,10 @@ index 0000000..fe282fb
 +
 diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
 new file mode 100644
-index 0000000..5844d23
+index 0000000..057da8c
 --- /dev/null
 +++ b/src/nacl/plugin.cc
-@@ -0,0 +1,264 @@
+@@ -0,0 +1,262 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -268,23 +268,21 @@ index 0000000..5844d23
 +  }
 +
 +  virtual void DidChangeView(const pp::Rect& position, const pp::Rect& clip) {
-+    printf("did change view, new %dx%d, old %dx%d\n",
++    fprintf(stderr, "did change view, new %dx%d, old %dx%d\n",
 +        position.size().width(), position.size().height(),
 +        width_, height_);
++    fflush(stderr);
 +
-+    if (position.size().width() == width_ &&
-+        position.size().height() == height_)
-+      return;  // Size didn't change, no need to update anything.
++    width_ = position.size().width();
++    height_ = position.size().height();
++
++    SDL_NACL_SetInstance(pp_instance(), width_, height_);
 +
 +    if (sdl_thread_started_ == false) {
-+      width_ = position.size().width();
-+      height_ = position.size().height();
-+
-+      SDL_NACL_SetInstance(pp_instance(), width_, height_);
 +      // It seems this call to SDL_Init is required. Calling from
 +      // sdl_main() isn't good enough.
 +      // Perhaps it must be called from the main thread?
-+      int lval = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
++      int lval = SDL_Init(SDL_INIT_AUDIO);
 +      assert(lval >= 0);
 +      if (0 == pthread_create(&sdl_main_thread_, NULL, sdl_thread_static, this)) {
 +        sdl_thread_started_ = true;
@@ -463,7 +461,7 @@ index 0000000..5844d23
 +}  // namespace pp
 diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
 new file mode 100755
-index 0000000..a8784c3
+index 0000000..56fe8f2
 --- /dev/null
 +++ b/utils/nacl/build.sh
 @@ -0,0 +1,15 @@
@@ -477,13 +475,13 @@ index 0000000..a8784c3
 +ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
 +PATH=$ROOT/bin:$ROOT/x86_64-nacl/usr/bin:$PATH
 +
-+PKG_CONFIG_PATH=$ROOT/x86_64-nacl/usr/lib/pkgconfig scons -j5 host=x86_64-nacl \
++PKG_CONFIG_PATH=$ROOT/x86_64-nacl/usr/lib/pkgconfig scons -j15 host=x86_64-nacl \
 +  boostdir=$ROOT/x86_64-nacl/usr/include/boost \
 +  boostlibdir=$ROOT/x86_64-nacl/usr/lib sdldir=$ROOT/x86_64-nacl/usr nls=no \
 +  destdir=$ROOT/x86_64-nacl \
 +  build=release wesnoth install
 diff --git a/utils/nacl/build32.sh b/utils/nacl/build32.sh
-new file mode 100755
+new file mode 100644
 index 0000000..842d263
 --- /dev/null
 +++ b/utils/nacl/build32.sh
@@ -675,7 +673,7 @@ index 0000000..3e3b198
 +
 diff --git a/utils/nacl/howto b/utils/nacl/howto
 new file mode 100644
-index 0000000..d93d90d
+index 0000000..6f6bfbf
 --- /dev/null
 +++ b/utils/nacl/howto
 @@ -0,0 +1,41 @@
@@ -697,9 +695,9 @@ index 0000000..d93d90d
 +
 +# Scan installed files, pack them in bundles.
 +# You can't realistically download 13000 small files over HTTP.
-+mkdir -p nacl/generated
-+./buildpack.py $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/share/wesnoth/
-+./genfs
++mkdir -p src/nacl/generated
++./utils/nacl/buildpack.py $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/share/wesnoth/
++./utils/nacl/genfs
 +
 +# Rebuild Wesnoth with the generated file metadata.
 +./utils/nacl/build.sh
@@ -721,7 +719,7 @@ index 0000000..d93d90d
 +CDNs that use HTTP 302 redirects to another domain for load balancing and do not set CORS
 +headers appropriately.
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
-new file mode 100755
+new file mode 100644
 index 0000000..dc83d03
 --- /dev/null
 +++ b/utils/nacl/install.sh
@@ -1224,7 +1222,7 @@ index 0000000..6b187d7
 +
 diff --git a/utils/nacl/static/wesnoth.nmf b/utils/nacl/static/wesnoth.nmf
 new file mode 100644
-index 0000000..a6d5c75
+index 0000000..a452854
 --- /dev/null
 +++ b/utils/nacl/static/wesnoth.nmf
 @@ -0,0 +1,52 @@
@@ -1234,29 +1232,29 @@ index 0000000..a6d5c75
 +    "x86-64": {"url": "lib64/runnable-ld.so"}
 +  },
 +  "files": {
-+    "libc.so.e0920b21" : {
-+      "x86-32" : {"url": "lib32/libc.so.e0920b21"},
-+      "x86-64" : {"url": "lib64/libc.so.e0920b21"}
++    "libc.so.5e6ad7ea" : {
++      "x86-32" : {"url": "lib32/libc.so.5e6ad7ea"},
++      "x86-64" : {"url": "lib64/libc.so.5e6ad7ea"}
 +    },
-+    "libdl.so.e0920b21" : {
-+      "x86-32" : {"url": "lib32/libdl.so.e0920b21"},
-+      "x86-64" : {"url": "lib64/libdl.so.e0920b21"}
++    "libdl.so.5e6ad7ea" : {
++      "x86-32" : {"url": "lib32/libdl.so.5e6ad7ea"},
++      "x86-64" : {"url": "lib64/libdl.so.5e6ad7ea"}
 +    },
-+    "librt.so.e0920b21" : {
-+      "x86-32" : {"url": "lib32/librt.so.e0920b21"},
-+      "x86-64" : {"url": "lib64/librt.so.e0920b21"}
++    "librt.so.5e6ad7ea" : {
++      "x86-32" : {"url": "lib32/librt.so.5e6ad7ea"},
++      "x86-64" : {"url": "lib64/librt.so.5e6ad7ea"}
 +    },
-+    "libm.so.e0920b21" : {
-+      "x86-32" : { "url": "lib32/libm.so.e0920b21"},
-+      "x86-64" : { "url": "lib64/libm.so.e0920b21"}
++    "libm.so.5e6ad7ea" : {
++      "x86-32" : { "url": "lib32/libm.so.5e6ad7ea"},
++      "x86-64" : { "url": "lib64/libm.so.5e6ad7ea"}
 +    },
 +    "libgcc_s.so.1" : {
 +      "x86-32" : { "url": "lib32/libgcc_s.so.1"},
 +      "x86-64" : { "url": "lib64/libgcc_s.so.1"}
 +    },
-+    "libpthread.so.e0920b21" : {
-+      "x86-32" : { "url": "lib32/libpthread.so.e0920b21"},
-+      "x86-64" : { "url": "lib64/libpthread.so.e0920b21"}
++    "libpthread.so.5e6ad7ea" : {
++      "x86-32" : { "url": "lib32/libpthread.so.5e6ad7ea"},
++      "x86-64" : { "url": "lib64/libpthread.so.5e6ad7ea"}
 +    },
 +    "libstdc++.so.6" : {
 +      "x86-32" : { "url": "lib32/libstdc++.so.6"},
