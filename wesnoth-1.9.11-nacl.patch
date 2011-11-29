@@ -1,3 +1,37 @@
+diff --git a/NaCl-LICENSE b/NaCl-LICENSE
+new file mode 100644
+index 0000000..1941a11
+--- /dev/null
++++ b/NaCl-LICENSE
+@@ -0,0 +1,28 @@
++Copyright 2008, Google Inc.
++All rights reserved.
++
++Redistribution and use in source and binary forms, with or without
++modification, are permitted provided that the following conditions are
++met:
++
++    * Redistributions of source code must retain the above copyright
++notice, this list of conditions and the following disclaimer.
++    * Redistributions in binary form must reproduce the above
++copyright notice, this list of conditions and the following disclaimer
++in the documentation and/or other materials provided with the
++distribution.
++    * Neither the name of Google Inc. nor the names of its
++contributors may be used to endorse or promote products derived from
++this software without specific prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 diff --git a/SConstruct b/SConstruct
 index 903227e..d71f906 100755
 --- a/SConstruct
@@ -193,13 +227,13 @@ index 0000000..fe282fb
 +
 diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
 new file mode 100644
-index 0000000..057da8c
+index 0000000..86c26f7
 --- /dev/null
 +++ b/src/nacl/plugin.cc
 @@ -0,0 +1,262 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
-+// found in the LICENSE file.
++// found in the NaCl-LICENSE file.
 +
 +#include <pthread.h>
 +#include <stdio.h>
@@ -460,15 +494,15 @@ index 0000000..057da8c
 +  }
 +}  // namespace pp
 diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
-new file mode 100755
-index 0000000..56fe8f2
+new file mode 100644
+index 0000000..7a69098
 --- /dev/null
 +++ b/utils/nacl/build.sh
 @@ -0,0 +1,15 @@
 +#!/bin/bash
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
++# found in the NaCl-LICENSE file.
 +
 +set -e -x
 +
@@ -482,14 +516,14 @@ index 0000000..56fe8f2
 +  build=release wesnoth install
 diff --git a/utils/nacl/build32.sh b/utils/nacl/build32.sh
 new file mode 100644
-index 0000000..842d263
+index 0000000..d7571e2
 --- /dev/null
 +++ b/utils/nacl/build32.sh
 @@ -0,0 +1,15 @@
 +#!/bin/bash
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
++# found in the NaCl-LICENSE file.
 +
 +set -e -x
 +
@@ -502,15 +536,15 @@ index 0000000..842d263
 +  destdir=$ROOT/i686-nacl \
 +  build=release wesnoth
 diff --git a/utils/nacl/buildpack.py b/utils/nacl/buildpack.py
-new file mode 100755
-index 0000000..f315a7d
+new file mode 100644
+index 0000000..a603e40
 --- /dev/null
 +++ b/utils/nacl/buildpack.py
 @@ -0,0 +1,145 @@
 +#!/usr/bin/python
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
++# found in the NaCl-LICENSE file.
 +
 +import shutil
 +import glob
@@ -653,15 +687,15 @@ index 0000000..f315a7d
 +fout_list.write('{"", "", 0}\n')
 +fout_list.close()
 diff --git a/utils/nacl/genfs.sh b/utils/nacl/genfs.sh
-new file mode 100755
-index 0000000..3e3b198
+new file mode 100644
+index 0000000..0b3d9e0
 --- /dev/null
 +++ b/utils/nacl/genfs.sh
 @@ -0,0 +1,13 @@
 +#!/bin/bash
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
++# found in the NaCl-LICENSE file.
 +
 +BASE=$NACL_SDK_ROOT/toolchain/linux_x86/x86_64-nacl
 +DIRS_OUT=src/nacl/generated/dir_list.h
@@ -720,14 +754,14 @@ index 0000000..6f6bfbf
 +headers appropriately.
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
 new file mode 100644
-index 0000000..dc83d03
+index 0000000..8f887bc
 --- /dev/null
 +++ b/utils/nacl/install.sh
 @@ -0,0 +1,48 @@
 +#!/bin/bash
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE file.
++# found in the NaCl-LICENSE file.
 +
 +set -e
 +
@@ -774,14 +808,14 @@ index 0000000..dc83d03
 +cp -rv $ROOT/usr/local/share/wesnoth/fonts/* $DST/usr/local/share/wesnoth/fonts/
 diff --git a/utils/nacl/static/check_browser.js b/utils/nacl/static/check_browser.js
 new file mode 100644
-index 0000000..9636ad0
+index 0000000..2e735b7
 --- /dev/null
 +++ b/utils/nacl/static/check_browser.js
 @@ -0,0 +1,178 @@
 +/*
 + * Copyright (c) 2011 The Native Client Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
-+ * found in the LICENSE file.
++ * found in the NaCl-LICENSE file.
 + */
 +
 +/**
@@ -958,14 +992,14 @@ index 0000000..9636ad0
 +
 diff --git a/utils/nacl/static/peppermount_helper.js b/utils/nacl/static/peppermount_helper.js
 new file mode 100644
-index 0000000..cf11da3
+index 0000000..1f542db
 --- /dev/null
 +++ b/utils/nacl/static/peppermount_helper.js
 @@ -0,0 +1,75 @@
 +/*
 + * Copyright (c) 2011 The Native Client Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
-+ * found in the LICENSE file.
++ * found in the NaCl-LICENSE file.
 + */
 +
 +function toArray(list) {
@@ -1039,7 +1073,7 @@ index 0000000..cf11da3
 +}
 diff --git a/utils/nacl/static/wesnoth.html b/utils/nacl/static/wesnoth.html
 new file mode 100644
-index 0000000..900e780
+index 0000000..54b6866
 --- /dev/null
 +++ b/utils/nacl/static/wesnoth.html
 @@ -0,0 +1,28 @@
@@ -1049,7 +1083,7 @@ index 0000000..900e780
 +  <!--
 +  Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +  Use of this source code is governed by a BSD-style license that can be
-+  found in the LICENSE file.
++  found in the NaCl-LICENSE file.
 +  -->
 +  <head>
 +    <title>Wesnoth NativeClient demo</title>
@@ -1073,14 +1107,14 @@ index 0000000..900e780
 +</HTML>
 diff --git a/utils/nacl/static/wesnoth.js b/utils/nacl/static/wesnoth.js
 new file mode 100644
-index 0000000..6b187d7
+index 0000000..bf26385
 --- /dev/null
 +++ b/utils/nacl/static/wesnoth.js
 @@ -0,0 +1,143 @@
 +/*
 + * Copyright (c) 2011 The Native Client Authors. All rights reserved.
 + * Use of this source code is governed by a BSD-style license that can be
-+ * found in the LICENSE file.
++ * found in the NaCl-LICENSE file.
 + */
 +
 +function updateProgressBar(percent, message, styleBackground,
