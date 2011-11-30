@@ -1,13 +1,13 @@
 {
   "name": "The Battle for Wesnoth",
-  "description": "NativeClient port of The Battle for Wesnoth",
-  "version": "1.9.9",
+  "description": "NativeClient port of The Battle for Wesnoth 1.9.11",
+  "version": "1.9.11.2",
   "app": {
     "urls": [
-      "http://nacl-wesnoth.commondatastorage.googleapis.com/"
+      "http://nacl-wesnoth.commondatastorage.googleapis.com/1.9.11"
     ],
     "launch": {
-      "web_url": "http://nacl-wesnoth.commondatastorage.googleapis.com/wesnoth.html"
+      "web_url": "http://nacl-wesnoth.commondatastorage.googleapis.com/1.9.11/wesnoth.html"
     }
   },
   "icons": {

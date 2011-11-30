@@ -227,10 +227,10 @@ index 0000000..fe282fb
 +
 diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
 new file mode 100644
-index 0000000..86c26f7
+index 0000000..fcea550
 --- /dev/null
 +++ b/src/nacl/plugin.cc
-@@ -0,0 +1,262 @@
+@@ -0,0 +1,264 @@
 +// Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the NaCl-LICENSE file.
@@ -413,9 +413,11 @@ index 0000000..86c26f7
 +    fflush(stderr);
 +
 +    // Finally, launch the game.
-+    static char const * argv[] = {"wesnoth", NULL};
-+    printf("starting game thread\n");
-+    wesnoth_main(1, (char**)argv);
++    char res_s[100];
++    snprintf(res_s, sizeof(res_s), "%dx%d", width_, height_);
++    static char const * argv[] = {"wesnoth", "-r", res_s, NULL};
++    printf("starting game thread: %s\n", res_s);
++    wesnoth_main(sizeof(argv) / sizeof(*argv) - 1, (char**)argv);
 +    return NULL;
 +  }
 +
@@ -515,7 +517,7 @@ index 0000000..7a69098
 +  destdir=$ROOT/x86_64-nacl \
 +  build=release wesnoth install
 diff --git a/utils/nacl/build32.sh b/utils/nacl/build32.sh
-new file mode 100644
+new file mode 100755
 index 0000000..d7571e2
 --- /dev/null
 +++ b/utils/nacl/build32.sh
@@ -753,7 +755,7 @@ index 0000000..6f6bfbf
 +CDNs that use HTTP 302 redirects to another domain for load balancing and do not set CORS
 +headers appropriately.
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
-new file mode 100644
+new file mode 100755
 index 0000000..8f887bc
 --- /dev/null
 +++ b/utils/nacl/install.sh
