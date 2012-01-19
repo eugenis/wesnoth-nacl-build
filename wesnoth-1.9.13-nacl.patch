@@ -1,3 +1,36 @@
+diff --git a/src/filesystem.cpp b/src/filesystem.cpp
+index 15b727e..b144575 100644
+--- a/src/filesystem.cpp
++++ b/src/filesystem.cpp
+@@ -687,7 +687,9 @@ const std::string &get_cache_dir()
+ {
+ 	if (cache_dir.empty())
+ 	{
+-#if defined(_X11) && !defined(PREFERENCES_DIR)
++#ifdef __native_client__
++		cache_dir = "/wesnoth-userdata/cache";
++#elif defined(_X11) && !defined(PREFERENCES_DIR)
+ 		char const *xdg_cache = getenv("XDG_CACHE_HOME");
+ 		if (!xdg_cache || xdg_cache[0] == '\0') {
+ 			xdg_cache = getenv("HOME");
+@@ -865,7 +867,7 @@ file_tree_checksum::file_tree_checksum()
+ 
+ file_tree_checksum::file_tree_checksum(const config& cfg) :
+ 	nfiles	(lexical_cast_default<size_t>(cfg["nfiles"])),
+-	sum_size(lexical_cast_default<size_t>(cfg["size"])),
++	sum_size(lexical_cast_default<size_t>(cfg["size"].str().substr(1, std::string::npos))),
+ 	modified(lexical_cast_default<time_t>(cfg["modified"]))
+ {
+ }
+@@ -873,7 +875,7 @@ file_tree_checksum::file_tree_checksum(const config& cfg) :
+ void file_tree_checksum::write(config& cfg) const
+ {
+ 	cfg["nfiles"] = lexical_cast<std::string>(nfiles);
+-	cfg["size"] = lexical_cast<std::string>(sum_size);
++	cfg["size"] = "i" + lexical_cast<std::string>(sum_size);
+ 	cfg["modified"] = lexical_cast<std::string>(modified);
+ }
+ 
 diff --git a/src/nacl/SConscript b/src/nacl/SConscript
 index c3e7f85..c627187 100644
 --- a/src/nacl/SConscript
@@ -35,13 +68,15 @@ index fe282fb..0000000
 -/* Intentionally empty */
 -
 diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
-index fcea550..26eebd3 100644
+index fcea550..802e103 100644
 --- a/src/nacl/plugin.cc
 +++ b/src/nacl/plugin.cc
-@@ -23,26 +23,6 @@ extern int wesnoth_main(int argc, char **argv);
+@@ -21,26 +21,7 @@ extern int wesnoth_main(int argc, char **argv);
+ #include <nacl-mounts/base/MainThreadRunner.h>
+ #include <nacl-mounts/http2/HTTP2Mount.h>
  #include <nacl-mounts/pepper/PepperMount.h>
- 
- 
+-
+-
 -const char* http_dirs[] = {
 -#include <dir_list.h>
 -};
@@ -60,22 +95,25 @@ index fcea550..26eebd3 100644
 -} http_packs[] = {
 -#include <pack_list.h>
 -};
--
--
++#include <nacl-mounts/buffer/BufferMount.h>
+ 
+ 
  class PluginInstance : public pp::Instance {
-  public:
-   explicit PluginInstance(PP_Instance instance) : pp::Instance(instance),
-@@ -50,7 +30,8 @@ class PluginInstance : public pp::Instance {
+@@ -50,9 +31,11 @@ class PluginInstance : public pp::Instance {
                                                    width_(0),
                                                    height_(0),
                                                    progress_handler_(this),
 -                                                  directory_reader_(this) {
 +                                                  directory_reader_(this),
-+                                                  http2_files_("") {
++                                                  http2_files_(""),
++                                                  http2_files2_("") {
      RequestInputEvents(PP_INPUTEVENT_CLASS_MOUSE);
-     RequestFilteringInputEvents(PP_INPUTEVENT_CLASS_KEYBOARD);
+-    RequestFilteringInputEvents(PP_INPUTEVENT_CLASS_KEYBOARD);
++    RequestFilteringInputEvents(PP_INPUTEVENT_CLASS_WHEEL | PP_INPUTEVENT_CLASS_KEYBOARD);
  
-@@ -101,7 +82,16 @@ class PluginInstance : public pp::Instance {
+     proxy_ = KernelProxy::KPInstance();
+     runner_ = new MainThreadRunner(this);
+@@ -101,7 +84,17 @@ class PluginInstance : public pp::Instance {
      directory_reader_.HandleResponse(s);
    }
  
@@ -85,7 +123,8 @@ index fcea550..26eebd3 100644
 +      std::string s = argn[i];
 +      if (s == "http2_files") {
 +	http2_files_ = argv[i];
-+	break;
++      } else if (s == "http2_files2") {
++	http2_files2_ = argv[i];
 +      }
 +    }
 +    fprintf(stderr, "http2_files='%s'\n", http2_files_.c_str());
@@ -93,16 +132,42 @@ index fcea550..26eebd3 100644
      return true;
    }
  
-@@ -113,6 +103,7 @@ class PluginInstance : public pp::Instance {
+@@ -113,6 +106,8 @@ class PluginInstance : public pp::Instance {
    KernelProxy* proxy_;
    MainThreadRunner* runner_;
    pp::FileSystem* fs_;
 +  std::string http2_files_;
++  std::string http2_files2_;
  
    static void* sdl_thread_static(void* param) {
      return reinterpret_cast<PluginInstance*>(param)->sdl_thread();
-@@ -139,28 +130,7 @@ class PluginInstance : public pp::Instance {
-     http2_mount->SetProgressHandler(&progress_handler_);
+@@ -123,55 +118,49 @@ class PluginInstance : public pp::Instance {
+     fflush(stderr);
+ 
+     // Setup writable homedir.
+-    PepperMount* pepper_mount = new PepperMount(runner_, fs_, 20 * 1024 * 1024);
+-    pepper_mount->SetDirectoryReader(&directory_reader_);
+-    pepper_mount->SetPathPrefix("/wesnoth-userdata");
++    PepperMount* rw_mount = new PepperMount(runner_, fs_, 20 * 1024 * 1024);
++    rw_mount->SetDirectoryReader(&directory_reader_);
++    rw_mount->SetPathPrefix("/wesnoth-userdata");
+ 
+     proxy_->mkdir("/wesnoth-userdata", 0777);
+-    int res = proxy_->mount("/wesnoth-userdata", pepper_mount);
++    // 20Mb NaCl-side memory cache.
++    int res = proxy_->mount("/wesnoth-userdata", new BufferMount(rw_mount, 4096, 5120));
+ 
+     // The following lines can be removed when nacl-mounts starts intercepting mkdir() calls.
++    proxy_->mkdir("/wesnoth-userdata/cache", 0777);
+     proxy_->mkdir("/wesnoth-userdata/saves", 0777);
+ 
+     // Setup r/o data directory in /usr/local/share/wesnoth
+-    HTTP2Mount* http2_mount = new HTTP2Mount(runner_, "./usr/local/share/wesnoth");
+-    http2_mount->SetLocalCache(fs_, 350*1024*1024, "/wesnoth0", true);
+-    http2_mount->SetProgressHandler(&progress_handler_);
++    HTTP2Mount* ro_mount = new HTTP2Mount(runner_, "./usr/local/share/wesnoth");
++    ro_mount->SetLocalCache(fs_, 350*1024*1024, "/wesnoth0", true);
++    ro_mount->SetProgressHandler(&progress_handler_);
   
      fprintf(stderr, "Registering known files.\n");
 -    fflush(stderr);
@@ -127,10 +192,51 @@ index fcea550..26eebd3 100644
 -        http2_mount->SetInPack(path, pack_path, offset);
 -      }
 -    }
-+    http2_mount->ReadManifest(http2_files_);
+-
+-    http2_mount->SetInMemory("/fonts/Andagii.ttf", true);
+-    http2_mount->SetInMemory("/fonts/DejaVuSans.ttf", true);
+-    http2_mount->SetInMemory("/fonts/wqy-zenhei.ttc", true);
++    ro_mount->ReadManifest(http2_files_);
  
-     http2_mount->SetInMemory("/fonts/Andagii.ttf", true);
-     http2_mount->SetInMemory("/fonts/DejaVuSans.ttf", true);
+     fprintf(stderr, "Mounting the filesystem.\n");
+     fflush(stderr);
+     proxy_->mkdir("/usr", 0777);
+     proxy_->mkdir("/usr/local", 0777);
+     proxy_->mkdir("/usr/local/share", 0777);
+-    res = proxy_->mount("/usr/local/share/wesnoth", http2_mount);
++    // 100Mb NaCl-side memory cache.
++    res = proxy_->mount("/usr/local/share/wesnoth", new BufferMount(ro_mount, 1048576, 100));
++
++    // Setup r/o data directory in /lib/locale
++    HTTP2Mount* ro_mount2 = new HTTP2Mount(runner_, "./lib/locale");
++    ro_mount2->SetLocalCache(fs_, 350*1024*1024, "/locale0", true);
++    ro_mount2->SetProgressHandler(&progress_handler_);
++ 
++    fprintf(stderr, "Registering known files.\n");
++    ro_mount2->ReadManifest(http2_files2_);
++
++    fprintf(stderr, "Mounting the filesystem.\n");
++    fflush(stderr);
++    proxy_->mkdir("/lib", 0777);
++    proxy_->mkdir("/lib/locale", 0777);
++    // 10Mb NaCl-side memory cache.
++    res = proxy_->mount("/lib/locale", new BufferMount(ro_mount2, 1048576, 10));
++
+     if (!res) {
+       fprintf(stderr, "FS initialization success.\n");
+     } else {
+diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
+index 7a69098..f35a031 100755
+--- a/utils/nacl/build.sh
++++ b/utils/nacl/build.sh
+@@ -10,6 +10,6 @@ PATH=$ROOT/bin:$ROOT/x86_64-nacl/usr/bin:$PATH
+ 
+ PKG_CONFIG_PATH=$ROOT/x86_64-nacl/usr/lib/pkgconfig scons -j15 host=x86_64-nacl \
+   boostdir=$ROOT/x86_64-nacl/usr/include/boost \
+-  boostlibdir=$ROOT/x86_64-nacl/usr/lib sdldir=$ROOT/x86_64-nacl/usr nls=no \
++  boostlibdir=$ROOT/x86_64-nacl/usr/lib sdldir=$ROOT/x86_64-nacl/usr \
+   destdir=$ROOT/x86_64-nacl \
+   build=release wesnoth install
 diff --git a/utils/nacl/buildpack.py b/utils/nacl/buildpack.py
 deleted file mode 100644
 index a603e40..0000000
@@ -284,10 +390,10 @@ index a603e40..0000000
 -fout_list.close()
 diff --git a/utils/nacl/fsconfig.py b/utils/nacl/fsconfig.py
 new file mode 100644
-index 0000000..d41fbd5
+index 0000000..f7f7ecd
 --- /dev/null
 +++ b/utils/nacl/fsconfig.py
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,97 @@
 +#!/usr/bin/python
 +# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 +# Use of this source code is governed by a BSD-style license that can be
@@ -377,6 +483,48 @@ index 0000000..d41fbd5
 +packs.append([['data/core/images/portraits', '*', '']])
 +packs.append([['data/core/images', '*', '']])
 +packs.append([['data', '*', 'data/core/music/*']])
++
++# Translations.
++for path in glob.glob(os.path.join(srcdir, 'translations/*')):
++    path = path[len(srcdir):]
++    if path[0] == '/':
++        path = path[1:]
++    print 'Translation: ' + path
++    packs.append([[path, '*', '']])
+diff --git a/utils/nacl/fsconfig2.py b/utils/nacl/fsconfig2.py
+new file mode 100644
+index 0000000..1fc717e
+--- /dev/null
++++ b/utils/nacl/fsconfig2.py
+@@ -0,0 +1,28 @@
++#!/usr/bin/python
++# Copyright (c) 2011 The Native Client Authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the NaCl-LICENSE file.
++
++import glob
++import os
++
++
++srcdir = os.path.join(os.environ['NACL_TOOLCHAIN_ROOT'], 'x86_64-nacl/lib/locale')
++destdir = os.path.abspath('inst/lib/locale')
++manifest = "_files"
++
++# pack description format: [root_mask, file_name_mask, file_path_exclusion_mask]
++# pack will contain 
++#   all files under (and including) the expansion of root_mask,
++#   whose names match file_name_mask,
++#   whose full path (with root_mask) does not match full_path_exclusion_mask
++packs = []
++
++# System locales.
++for path in glob.glob(os.path.join(srcdir, '*')):
++    path = path[len(srcdir):]
++    if path[0] == '/':
++        path = path[1:]
++    print 'Locale: ' + path
++    packs.append([[path, '*', '']])
++
 diff --git a/utils/nacl/genfs.sh b/utils/nacl/genfs.sh
 deleted file mode 100755
 index 0b3d9e0..0000000
@@ -397,7 +545,7 @@ index 0b3d9e0..0000000
 -echo '{"", 0}' >>$FILES_OUT
 -
 diff --git a/utils/nacl/howto b/utils/nacl/howto
-index 6f6bfbf..78769d2 100644
+index 6f6bfbf..2120200 100644
 --- a/utils/nacl/howto
 +++ b/utils/nacl/howto
 @@ -2,8 +2,8 @@ Building Wesnoth for NativeClient.
@@ -411,7 +559,7 @@ index 6f6bfbf..78769d2 100644
  
  2. Get naclports: http://code.google.com/p/naclports/
  Build the ports for both x86_64 and i686:
-@@ -13,24 +13,14 @@ This will install all prerequisites under $NACL_TOOLCHAIN_ROOT.
+@@ -13,24 +13,24 @@ This will install all prerequisites under $NACL_TOOLCHAIN_ROOT.
  
  3. Build Wesnoth.
  ./utils/nacl/build.sh # build and install under $NACL_TOOLCHAIN_ROOT
@@ -430,10 +578,20 @@ index 6f6bfbf..78769d2 100644
 +./utils/nacl/build32.sh # build the 32-bit binary
  cp wesnoth $NACL_TOOLCHAIN_ROOT/x86_64-nacl/usr/local/share/bin/wesnoth32
  
- 4. Deploy
+-4. Deploy
 -Copy stuff from utils/nacl/static to $NACL_TOOLCHAIN_ROOT/x86_64-nacl
--
++3.5 Optional: build system locales
++This is required to get game in languages other than English.
++NaCl SDK comes without any prebuilt locales. This may take a while.
++Get eglibc-2.9 source, and build localedef program with --exec-prefix=$NACL_TOOLCHAIN_ROOT/x86_64-nacl.
++Then,
++cd $NACL_TOOLCHAIN_ROOT/x86_64-nacl
++for i in `cd share/i18n/locales; ls`; do
++  echo $i; /path/to/localedef -f UTF-8 -i $i --no-archive $i.UTF-8;
++done
+ 
 -./install.sh inst
++4. Deploy
 +# Scan installed files, pack them in bundles.
 +# You can't realistically download 13000 small files over HTTP.
 +# This will place Wesnoth binaries and packed data under inst/.
@@ -442,10 +600,10 @@ index 6f6bfbf..78769d2 100644
  Upload inst/ to any static file hosting.
  Open wesnoth.html in Chromium >= 15. At the moment you need to either enable NativeClient in
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
-index 8f887bc..f5fe373 100755
+index 8f887bc..477aaf2 100755
 --- a/utils/nacl/install.sh
 +++ b/utils/nacl/install.sh
-@@ -1,31 +1,16 @@
+@@ -1,31 +1,20 @@
  #!/bin/bash
 -# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 -# Use of this source code is governed by a BSD-style license that can be
@@ -477,15 +635,19 @@ index 8f887bc..f5fe373 100755
 -cp -v $ROOT/peppermount_helper.js $DST/
 +rm -rf $DST
 +$ROOT/usr/lib/nacl-mounts/util/genfs.py ./utils/nacl/fsconfig.py
++$ROOT/usr/lib/nacl-mounts/util/genfs.py ./utils/nacl/fsconfig2.py
 +INDEX=`(cd $DST/usr/local/share/wesnoth && ls _files*)`
++INDEXX=`(cd $DST/lib/locale && ls _files*)`
 +echo $INDEX
++echo $INDEXX
 +
 +cp utils/nacl/static/* $DST/
 +echo "http2_files='/$INDEX';" >$DST/fs.js
++echo "http2_files2='/$INDEXX';" >>$DST/fs.js
  
  mkdir -p $DST/usr/local/bin/
  cp -v $ROOT/usr/local/bin/wesnoth $ROOT/usr/local/bin/wesnoth32 $DST/usr/local/bin/
-@@ -37,12 +22,3 @@ done
+@@ -37,12 +26,3 @@ done
  for lib in `cat $ROOT/wesnoth.nmf | grep '"url": "lib64' | perl -pe 's/^.*?url": "lib64\/(.*)".*/$1/'`; do
      cp -v $ROOT/lib64/$lib $DST/lib64/$lib
  done
@@ -511,14 +673,15 @@ index 54b6866..3b0afc2 100644
      <script src="wesnoth.js"></script>
  
 diff --git a/utils/nacl/static/wesnoth.js b/utils/nacl/static/wesnoth.js
-index bf26385..19f495c 100644
+index bf26385..7684f93 100644
 --- a/utils/nacl/static/wesnoth.js
 +++ b/utils/nacl/static/wesnoth.js
-@@ -79,6 +79,7 @@ function requestQuotaAndStartWesnoth() {
+@@ -79,6 +79,8 @@ function requestQuotaAndStartWesnoth() {
                  embed.setAttribute('height', 800);
                  embed.setAttribute('src', 'wesnoth.nmf');
                  embed.setAttribute('type', 'application/x-nacl');
 +		embed.setAttribute('http2_files', http2_files);
++		embed.setAttribute('http2_files2', http2_files2);
                  var div = document.getElementById("nacl_div");
                  div.appendChild(embed);
                  div.addEventListener('progress', HandleProgress, true);
