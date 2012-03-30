@@ -1,19 +1,19 @@
 {
   "name": "The Battle for Wesnoth",
-  "description": "NativeClient port of The Battle for Wesnoth 1.9.11",
-  "version": "1.9.11.2",
+  "description": "NativeClient port of The Battle for Wesnoth 1.10.0",
+  "version": "1.10.0.1",
   "app": {
     "urls": [
-      "http://nacl-wesnoth.commondatastorage.googleapis.com/1.9.11"
+      "http://wesnoth-nacl.appspot.com/"
     ],
     "launch": {
-      "web_url": "http://nacl-wesnoth.commondatastorage.googleapis.com/1.9.11/wesnoth.html"
+      "web_url": "http://wesnoth-nacl.appspot.com/1.10.0.1/wesnoth.html"
     }
   },
   "icons": {
     "128": "wesnoth-icon-Mac.png"
   },
-  "minimum_chrome_version": "15",
+  "minimum_chrome_version": "16",
   "permissions": [
     "unlimitedStorage"
   ]
