@@ -1,8 +1,8 @@
 diff --git a/src/filesystem.cpp b/src/filesystem.cpp
-index 623c083..e5f7190 100644
+index e0cb746..9aac538 100644
 --- a/src/filesystem.cpp
 +++ b/src/filesystem.cpp
-@@ -687,7 +687,9 @@ const std::string &get_cache_dir()
+@@ -707,7 +707,9 @@ const std::string &get_cache_dir()
  {
  	if (cache_dir.empty())
  	{
@@ -13,7 +13,7 @@ index 623c083..e5f7190 100644
  		char const *xdg_cache = getenv("XDG_CACHE_HOME");
  		if (!xdg_cache || xdg_cache[0] == '\0') {
  			xdg_cache = getenv("HOME");
-@@ -865,7 +867,7 @@ file_tree_checksum::file_tree_checksum()
+@@ -885,7 +887,7 @@ file_tree_checksum::file_tree_checksum()
  
  file_tree_checksum::file_tree_checksum(const config& cfg) :
  	nfiles	(lexical_cast_default<size_t>(cfg["nfiles"])),
@@ -22,7 +22,7 @@ index 623c083..e5f7190 100644
  	modified(lexical_cast_default<time_t>(cfg["modified"]))
  {
  }
-@@ -873,7 +875,7 @@ file_tree_checksum::file_tree_checksum(const config& cfg) :
+@@ -893,7 +895,7 @@ file_tree_checksum::file_tree_checksum(const config& cfg) :
  void file_tree_checksum::write(config& cfg) const
  {
  	cfg["nfiles"] = lexical_cast<std::string>(nfiles);
@@ -68,7 +68,7 @@ index fe282fb..0000000
 -/* Intentionally empty */
 -
 diff --git a/src/nacl/plugin.cc b/src/nacl/plugin.cc
-index fcea550..802e103 100644
+index fcea550..db6057e 100644
 --- a/src/nacl/plugin.cc
 +++ b/src/nacl/plugin.cc
 @@ -21,26 +21,7 @@ extern int wesnoth_main(int argc, char **argv);
@@ -113,7 +113,40 @@ index fcea550..802e103 100644
  
      proxy_ = KernelProxy::KPInstance();
      runner_ = new MainThreadRunner(this);
-@@ -101,7 +84,17 @@ class PluginInstance : public pp::Instance {
+@@ -68,16 +51,26 @@ class PluginInstance : public pp::Instance {
+     }
+   }
+ 
+-  virtual void DidChangeView(const pp::Rect& position, const pp::Rect& clip) {
+-    fprintf(stderr, "did change view, new %dx%d, old %dx%d\n",
+-        position.size().width(), position.size().height(),
+-        width_, height_);
++  virtual void DidChangeFocus(bool has_focus) {
++    fprintf(stderr, "focus: %d\n", has_focus);
++    fflush(stderr);
++    SDL_NACL_SetHasFocus(has_focus);
++  }
++
++  virtual void DidChangeView(const pp::View& view) {
++// const pp::Rect& position, const pp::Rect& clip) {
++    fprintf(stderr, "did change view, new %dx%d, old %dx%d; %s, %s\n",
++        view.GetRect().width(), view.GetRect().height(),
++        width_, height_,
++        view.IsVisible() ? "plugin visible" : "plugin invisible",
++        view.IsPageVisible() ? "page visible" : "page invisible");
+     fflush(stderr);
+ 
+-    width_ = position.size().width();
+-    height_ = position.size().height();
++    width_ = view.GetRect().width();
++    height_ = view.GetRect().height();
+ 
+     SDL_NACL_SetInstance(pp_instance(), width_, height_);
++    SDL_NACL_SetPageVisible(view.IsPageVisible());
+ 
+     if (sdl_thread_started_ == false) {
+       // It seems this call to SDL_Init is required. Calling from
+@@ -101,7 +94,17 @@ class PluginInstance : public pp::Instance {
      directory_reader_.HandleResponse(s);
    }
  
@@ -132,7 +165,7 @@ index fcea550..802e103 100644
      return true;
    }
  
-@@ -113,6 +106,8 @@ class PluginInstance : public pp::Instance {
+@@ -113,6 +116,8 @@ class PluginInstance : public pp::Instance {
    KernelProxy* proxy_;
    MainThreadRunner* runner_;
    pp::FileSystem* fs_;
@@ -141,7 +174,7 @@ index fcea550..802e103 100644
  
    static void* sdl_thread_static(void* param) {
      return reinterpret_cast<PluginInstance*>(param)->sdl_thread();
-@@ -123,55 +118,49 @@ class PluginInstance : public pp::Instance {
+@@ -123,55 +128,49 @@ class PluginInstance : public pp::Instance {
      fflush(stderr);
  
      // Setup writable homedir.
@@ -226,10 +259,14 @@ index fcea550..802e103 100644
        fprintf(stderr, "FS initialization success.\n");
      } else {
 diff --git a/utils/nacl/build.sh b/utils/nacl/build.sh
-index 7a69098..5c302f6 100755
+index 7a69098..70107c0 100755
 --- a/utils/nacl/build.sh
 +++ b/utils/nacl/build.sh
-@@ -8,8 +8,8 @@ set -e -x
+@@ -5,11 +5,12 @@
+ 
+ set -e -x
+ 
++NACL_TOOLCHAIN_ROOT=$NACL_SDK_ROOT/toolchain/linux_x86_glibc
  ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
  PATH=$ROOT/bin:$ROOT/x86_64-nacl/usr/bin:$PATH
  
@@ -241,10 +278,14 @@ index 7a69098..5c302f6 100755
    destdir=$ROOT/x86_64-nacl \
    build=release wesnoth install
 diff --git a/utils/nacl/build32.sh b/utils/nacl/build32.sh
-index d7571e2..aa9adb7 100755
+index d7571e2..b8ec53e 100755
 --- a/utils/nacl/build32.sh
 +++ b/utils/nacl/build32.sh
-@@ -8,7 +8,7 @@ set -e -x
+@@ -5,10 +5,11 @@
+ 
+ set -e -x
+ 
++NACL_TOOLCHAIN_ROOT=$NACL_SDK_ROOT/toolchain/linux_x86_glibc
  ROOT=${NACL_TOOLCHAIN_ROOT:-$HOME/root/nacl-sdk}
  PATH=$ROOT/bin:$ROOT/i686-nacl/usr/bin:$PATH
  
@@ -618,10 +659,10 @@ index 6f6bfbf..b449e63 100644
  Upload inst/ to any static file hosting.
  Open wesnoth.html in Chromium >= 15. At the moment you need to either enable NativeClient in
 diff --git a/utils/nacl/install.sh b/utils/nacl/install.sh
-index 8f887bc..59528df 100755
+index 8f887bc..43a853b 100755
 --- a/utils/nacl/install.sh
 +++ b/utils/nacl/install.sh
-@@ -1,48 +1,28 @@
+@@ -1,48 +1,29 @@
  #!/bin/bash
 -# Copyright (c) 2011 The Native Client Authors. All rights reserved.
 -# Use of this source code is governed by a BSD-style license that can be
@@ -642,6 +683,7 @@ index 8f887bc..59528df 100755
 -fi
 -
 +DST=inst
++export NACL_TOOLCHAIN_ROOT=$NACL_SDK_ROOT/toolchain/linux_x86_glibc
  ROOT=$NACL_TOOLCHAIN_ROOT/x86_64-nacl
 -WESNOTH=$ROOT/usr/local/share/wesnoth
  
@@ -931,23 +973,52 @@ index bf26385..af4dcd4 100644
 +if (checkBrowser()) requestQuotaAndStartWesnoth();
 +
  
-diff --git a/utils/nacl/static/wesnoth_fs.png b/utils/nacl/static/wesnoth_fs.png
-new file mode 100644
-index 0000000..5358277
-Binary files /dev/null and b/utils/nacl/static/wesnoth_fs.png differ
-diff --git a/utils/nacl/static/wesnoth_logo.png b/utils/nacl/static/wesnoth_logo.png
-new file mode 100644
-index 0000000..367eb3c
-Binary files /dev/null and b/utils/nacl/static/wesnoth_logo.png differ
-diff --git a/utils/nacl/static/wesnoth_native.png b/utils/nacl/static/wesnoth_native.png
-new file mode 100644
-index 0000000..7b98969
-Binary files /dev/null and b/utils/nacl/static/wesnoth_native.png differ
-diff --git a/utils/nacl/static/wesnoth_source.png b/utils/nacl/static/wesnoth_source.png
-new file mode 100644
-index 0000000..b1189cd
-Binary files /dev/null and b/utils/nacl/static/wesnoth_source.png differ
-diff --git a/utils/nacl/static/wesnoth_url.png b/utils/nacl/static/wesnoth_url.png
-new file mode 100644
-index 0000000..1b3bc83
-Binary files /dev/null and b/utils/nacl/static/wesnoth_url.png differ
+diff --git a/utils/nacl/static/wesnoth.nmf b/utils/nacl/static/wesnoth.nmf
+index a452854..1044722 100644
+--- a/utils/nacl/static/wesnoth.nmf
++++ b/utils/nacl/static/wesnoth.nmf
+@@ -4,29 +4,29 @@
+     "x86-64": {"url": "lib64/runnable-ld.so"}
+   },
+   "files": {
+-    "libc.so.5e6ad7ea" : {
+-      "x86-32" : {"url": "lib32/libc.so.5e6ad7ea"},
+-      "x86-64" : {"url": "lib64/libc.so.5e6ad7ea"}
++    "libc.so.3c8d1f2e" : {
++      "x86-32" : {"url": "lib32/libc.so.3c8d1f2e"},
++      "x86-64" : {"url": "lib64/libc.so.3c8d1f2e"}
+     },
+-    "libdl.so.5e6ad7ea" : {
+-      "x86-32" : {"url": "lib32/libdl.so.5e6ad7ea"},
+-      "x86-64" : {"url": "lib64/libdl.so.5e6ad7ea"}
++    "libdl.so.3c8d1f2e" : {
++      "x86-32" : {"url": "lib32/libdl.so.3c8d1f2e"},
++      "x86-64" : {"url": "lib64/libdl.so.3c8d1f2e"}
+     },
+-    "librt.so.5e6ad7ea" : {
+-      "x86-32" : {"url": "lib32/librt.so.5e6ad7ea"},
+-      "x86-64" : {"url": "lib64/librt.so.5e6ad7ea"}
++    "librt.so.3c8d1f2e" : {
++      "x86-32" : {"url": "lib32/librt.so.3c8d1f2e"},
++      "x86-64" : {"url": "lib64/librt.so.3c8d1f2e"}
+     },
+-    "libm.so.5e6ad7ea" : {
+-      "x86-32" : { "url": "lib32/libm.so.5e6ad7ea"},
+-      "x86-64" : { "url": "lib64/libm.so.5e6ad7ea"}
++    "libm.so.3c8d1f2e" : {
++      "x86-32" : { "url": "lib32/libm.so.3c8d1f2e"},
++      "x86-64" : { "url": "lib64/libm.so.3c8d1f2e"}
+     },
+     "libgcc_s.so.1" : {
+       "x86-32" : { "url": "lib32/libgcc_s.so.1"},
+       "x86-64" : { "url": "lib64/libgcc_s.so.1"}
+     },
+-    "libpthread.so.5e6ad7ea" : {
+-      "x86-32" : { "url": "lib32/libpthread.so.5e6ad7ea"},
+-      "x86-64" : { "url": "lib64/libpthread.so.5e6ad7ea"}
++    "libpthread.so.3c8d1f2e" : {
++      "x86-32" : { "url": "lib32/libpthread.so.3c8d1f2e"},
++      "x86-64" : { "url": "lib64/libpthread.so.3c8d1f2e"}
+     },
+     "libstdc++.so.6" : {
+       "x86-32" : { "url": "lib32/libstdc++.so.6"},
